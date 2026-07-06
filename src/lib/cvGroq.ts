@@ -61,13 +61,11 @@ The summary must focus on impact, specific achievements, and professional value.
         const content = chatCompletion.choices[0]?.message?.content;
         if (content) return content.trim();
       } catch (err) {
-        console.error('Groq AI Assist summary failed, falling back:', err);
+        console.error('Groq AI Assist summary failed:', err);
+        throw err;
       }
     }
-
-    // অফলাইন জেনারেটর (Offline simulated response)
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return `Results-driven software professional specialized in ${profile.skills.slice(0, 3).join(', ')} with a solid background in designing high-performance systems. Proven expertise in developing responsive interfaces, optimizing backend services, and leading tech migrations. Committed to leveraging technical skills in ${profile.skills.slice(3, 5).join(', ') || 'modern frameworks'} to deliver scalable solutions that drive corporate efficiency and client satisfaction.`;
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ২. ডেসক্রিপশন ইম্প্রুভ করা (Improve Work/Project Description)
@@ -93,13 +91,11 @@ Respond ONLY with the rewritten text. Do not write intro, explanation, or markdo
         const content = chatCompletion.choices[0]?.message?.content;
         if (content) return content.trim();
       } catch (err) {
-        console.error('Groq AI Improve description failed, falling back:', err);
+        console.error('Groq AI Improve description failed:', err);
+        throw err;
       }
     }
-
-    // অফলাইন জেনারেটর (Offline simulation)
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return `• Spearheaded the development of core system features, enhancing load speeds by 35% and streamlining user acquisition.\n• Engineered reusable component architectures that reduced frontend code complexity and minimized maintenance overhead by 20%.\n• Leveraged technical workflows and industry best practices to deliver critical software milestones on schedule.`;
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৩. আপলোড করা সিভি ফাইল এনালাইসিস করা (Analyze & Extract CV File Content)
@@ -192,105 +188,12 @@ Ensure all lists are populated with real, helpful data based on the CV.`;
             return result;
           }
         }
-      } catch (err) {
-        console.error('Groq CV Analysis failed, using mock system:', err);
+        throw new Error('Invalid JSON format from AI');
+      } catch (err: any) {
+        console.error('Groq CV Analysis failed:', err);
+        throw new Error('Failed to analyze CV using AI: ' + err.message);
       }
     }
-
-    // অফলাইন জেনারেটর (Bulletproof mock response based on filename)
-    await new Promise(resolve => setTimeout(resolve, 2500));
-    const nameFromFileName = fileName.replace(/\.[^/.]+$/, "").replace(/_/g, " ").replace(/-/g, " ");
-    
-    // রিয়েল-লাইফ ডেমো ডাটা তৈরি করা (Generate highly realistic analysis response)
-    return {
-      scores: {
-        atsScore: 78,
-        resumeQualityScore: 82,
-        skillScore: 85,
-        professionalismScore: 80,
-        communicationScore: 75
-      },
-      feedback: {
-        strengths: [
-          'Strong command of modern React ecosystem and responsive Web layout tools.',
-          'Great project section with clear scope and individual contributions stated.',
-          'Solid inclusion of version control pipelines (Git/GitHub).'
-        ],
-        weaknesses: [
-          'Education description is sparse, lacks GPA or honors mention.',
-          'Experience is described in passive language rather than action-oriented bullet points.',
-          'No mention of automated test suites or modern component unit testing (Jest/Vitest).'
-        ],
-        missingSkills: [
-          'Docker',
-          'TypeScript Advanced Utility Types',
-          'GraphQL',
-          'CI/CD Workflows'
-        ],
-        grammarProblems: [
-          'Minor repetition of "responsible for" in experience bullets.',
-          'Ensure consistent punctuation at the end of bullet lists.'
-        ],
-        formattingIssues: [
-          'Remove unnecessary visual bar levels for skills as they confuse ATS parsers.',
-          'Ensure date formats are consistent (e.g., use "Jan 2024 - Present" everywhere).'
-        ],
-        atsIssues: [
-          'The document uses a two-column design which some older parsing machines read out of order.',
-          'Ensure the header contains phone and email in standard text strings.'
-        ],
-        careerSuggestions: [
-          'Focus on elevating intermediate TypeScript skills to enterprise-grade system patterns.',
-          'Build and deploy a complex state manager project to stand out in technical CV sweeps.'
-        ]
-      },
-      extractedData: {
-        personalInfo: {
-          name: nameFromFileName.toUpperCase() || 'ARIFUL ISLAM',
-          phone: '+8801712-345678',
-          email: 'nishat.af27@gmail.com',
-          address: 'Dhaka, Bangladesh',
-          linkedin: 'https://linkedin.com/in/username',
-          github: 'https://github.com/username',
-          portfolio: 'https://username.dev'
-        },
-        careerSummary: 'Detail-oriented and performance-driven Frontend Engineer with 2+ years of hands-on experience designing, developing, and deploying robust user interfaces using the React/Vite ecosystem. Expert at optimizing client-side rendering bottlenecks and building accessible web modules.',
-        education: [
-          {
-            id: 'edu_1',
-            degree: 'Bachelor of Science in Computer Science & Engineering',
-            institution: 'University of Dhaka',
-            year: '2022',
-            gpa: '3.65 / 4.00'
-          }
-        ],
-        experience: [
-          {
-            id: 'exp_1',
-            company: 'Dynamic Tech Bangladesh',
-            role: 'Junior Frontend Developer',
-            duration: 'Jan 2023 - Present',
-            description: 'Responsible for creating pixel-perfect layouts using Tailwind CSS. Collaborated with cross-functional product leads to migrate key services to React 18, enhancing performance by 30%. Built interactive real-time dashboards utilizing charting mechanisms.',
-            isCurrent: true
-          }
-        ],
-        projects: [
-          {
-            id: 'proj_1',
-            title: 'E-Commerce Core Dashboard',
-            description: 'Designed a comprehensive management dashboard with customizable charts, real-time sales reporting, and detailed order logs.',
-            techStack: 'React, Tailwind CSS, Recharts, LocalStorage',
-            github: 'https://github.com/username/dashboard',
-            liveLink: 'https://dashboard-preview.net'
-          }
-        ],
-        skills: {
-          softSkills: ['Problem Solving', 'Team Collaboration', 'Adaptive Mindset', 'Agile Communication'],
-          technicalSkills: ['React', 'JavaScript (ES6+)', 'TypeScript', 'Tailwind CSS', 'Vite', 'Git & GitHub'],
-          languages: ['Bangla (Native)', 'English (Professional)'],
-          certificates: ['Responsive Web Design (freeCodeCamp)', 'Advanced React Certificate (Meta)']
-        }
-      }
-    };
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   }
 };

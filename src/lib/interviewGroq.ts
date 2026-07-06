@@ -95,55 +95,13 @@ You MUST return ONLY a raw JSON object with the following schema (no markdown wr
             };
           }
         }
-      } catch (err) {
-        console.error('Groq career detection failed, falling back:', err);
+        throw new Error('Invalid JSON format from AI');
+      } catch (err: any) {
+        console.error('Groq career detection failed:', err);
+        throw new Error('Failed to analyze CV for interview using AI: ' + err.message);
       }
     }
-
-    // অফলাইন মোড সিমুলেশন (Robust Offline career detection fallback based on CV content keywords)
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    // ডিফল্ট ডিটেকশন লজিক
-    let careerPath = 'Software Engineer';
-    const skills: string[] = [];
-
-    // স্কিল সংগ্রহ
-    if (cv.skills?.technicalSkills?.length) {
-      skills.push(...cv.skills.technicalSkills.slice(0, 6));
-    }
-    if (cv.skills?.softSkills?.length) {
-      skills.push(...cv.skills.softSkills.slice(0, 3));
-    }
-
-    // কি-ওয়ার্ড ম্যাপিং
-    const techStr = JSON.stringify(cv).toLowerCase();
-    if (techStr.includes('react') || techStr.includes('next.js') || techStr.includes('frontend')) {
-      careerPath = 'Frontend Engineer';
-    } else if (techStr.includes('node') && techStr.includes('react')) {
-      careerPath = 'Full Stack Developer';
-    } else if (techStr.includes('node') || techStr.includes('express') || techStr.includes('django') || techStr.includes('backend')) {
-      careerPath = 'Backend Engineer';
-    } else if (techStr.includes('marketing') || techStr.includes('sales') || techStr.includes('seo')) {
-      careerPath = 'Digital Marketing Specialist';
-    } else if (techStr.includes('hr') || techStr.includes('human resources') || techStr.includes('recruiting')) {
-      careerPath = 'HR Manager';
-    } else if (techStr.includes('data science') || techStr.includes('python') || techStr.includes('machine learning')) {
-      careerPath = 'Data Scientist';
-    }
-
-    if (skills.length === 0) {
-      skills.push('Problem Solving', 'Teamwork', 'Communication', 'Adaptability');
-    }
-
-    const resumeScore = cv.scores?.atsScore || 78;
-
-    return {
-      careerPath,
-      skills,
-      readinessScore: Math.round(resumeScore * 1.05) > 100 ? 98 : Math.round(resumeScore * 1.05),
-      duration: '25 Minutes',
-      resumeScore
-    };
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ২. প্রথম প্রশ্ন জেনারেট করা (Generate first ice-breaker question)
@@ -188,13 +146,12 @@ Keep the tone extremely polite, corporate yet encouraging. Respond ONLY with the
         });
         const content = response.choices[0]?.message?.content;
         if (content) return content.trim();
-      } catch (err) {
+      } catch (err: any) {
         console.error('Groq first question failed:', err);
+        throw new Error('Failed to generate interview question using AI: ' + err.message);
       }
     }
-
-    await new Promise(resolve => setTimeout(resolve, 800));
-    return `Hello and welcome to your AI live interview! It is a pleasure to have you here today. Looking at your background, you have a solid foundation as a ${careerPath}. To kick off our session, could you please introduce yourself and share how your core skills in ${skills.slice(0, 3).join(', ')} helped you deliver your most successful project?`;
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৩. উত্তর বিশ্লেষণ করা এবং পরবর্তী বুদ্ধিদীপ্ত প্রশ্ন জেনারেট করা (Process answer and generate dynamic follow-up)
@@ -308,48 +265,13 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
             };
           }
         }
-      } catch (err) {
-        console.error('Groq next question generation failed, using fallback:', err);
+        throw new Error('Invalid JSON format from AI');
+      } catch (err: any) {
+        console.error('Groq next question generation failed:', err);
+        throw new Error('Failed to process answer and generate next question using AI: ' + err.message);
       }
     }
-
-    // অফলাইন জেনারেটর (Offline fallback simulator)
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
-    // ক্যান্ডিডেটের উত্তরের দৈর্ঘ্য ও কিওয়ার্ড অনুসারে একটি মক স্কোর নির্ধারণ করি
-    const len = lastAnswer.trim().length;
-    let scoreSeed = 75;
-    if (len < 15) scoreSeed = 45;
-    else if (len < 40) scoreSeed = 65;
-    else if (len > 120) scoreSeed = 88;
-
-    const answerScores = {
-      technical: Math.min(100, Math.round(scoreSeed + Math.random() * 8)),
-      confidence: Math.min(100, Math.round(scoreSeed + Math.random() * 10 - 2)),
-      communication: Math.min(100, Math.round(scoreSeed + Math.random() * 6)),
-      problemSolving: Math.min(100, Math.round(scoreSeed + Math.random() * 10)),
-      professionalism: Math.min(100, Math.round(scoreSeed + Math.random() * 4)),
-      english: Math.min(100, Math.round(scoreSeed + Math.random() * 5))
-    };
-
-    // মক ফলো-আপ প্রশ্নাবলি (Dynamic Offline Fallback Questions mapped by Question Count)
-    const fallbackQuestions = [
-      `That is a wonderful introduction. Could you tell me more about how you handle state management or scalability when designing complex systems?`,
-      `Thank you for that detailed explanation. Now, could you walk me through a challenging technical problem you faced in your project and the step-by-step logic you used to debug and solve it?`,
-      `Excellent points! In professional teams, conflict or tight deadlines can sometimes create pressure. Can you recall a time you disagreed with a colleague or manager, and how you communicated to find a constructive resolution?`,
-      `Great. Let us look at a situational scenario: If a critical production feature goes offline right before a product launch, but your manager is unreachable, what is your immediate process for triaging and resolving the crisis?`,
-      `That was a highly professional answer. To wrap up our interview, how do you keep up with the latest industry frameworks and how do you ensure that your English and client communication remain sharp during international collaborations?`
-    ];
-
-    const fallbackFeedback = "Your description shows real practical experience and solid structural thinking. That is a highly valuable trait in team settings.";
-    const categories = ['Technical', 'Problem Solving', 'Behavioral', 'HR', 'Communication'];
-
-    return {
-      nextQuestion: fallbackQuestions[(questionCount - 1) % fallbackQuestions.length],
-      nextCategory: categories[(questionCount - 1) % categories.length],
-      answerScores,
-      answerFeedback: fallbackFeedback
-    };
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৪. শেষ রিভিউ ও ওভারঅল স্কোর জেনারেট করা (Generate overall interview summary at the end)
@@ -428,77 +350,13 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
             return res;
           }
         }
-      } catch (err) {
+        throw new Error('Invalid JSON format from AI');
+      } catch (err: any) {
         console.error('Groq final evaluation failed:', err);
+        throw new Error('Failed to generate interview summary using AI: ' + err.message);
       }
     }
-
-    // অফলাইন জেনারেটর (Offline Simulator)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // এভারেজ ক্যালকুলেশন ফ্রম হিস্ট্রি
-    let techAvg = 0, confAvg = 0, commAvg = 0, probAvg = 0, profAvg = 0, engAvg = 0;
-    let count = 0;
-
-    qaHistory.forEach(q => {
-      if (q.scores) {
-        techAvg += q.scores.technical;
-        confAvg += q.scores.confidence;
-        commAvg += q.scores.communication;
-        probAvg += q.scores.problemSolving;
-        profAvg += q.scores.professionalism;
-        engAvg += q.scores.english;
-        count++;
-      }
-    });
-
-    if (count > 0) {
-      techAvg = Math.round(techAvg / count);
-      confAvg = Math.round(confAvg / count);
-      commAvg = Math.round(commAvg / count);
-      probAvg = Math.round(probAvg / count);
-      profAvg = Math.round(profAvg / count);
-      engAvg = Math.round(engAvg / count);
-    } else {
-      techAvg = 75; confAvg = 72; commAvg = 78; probAvg = 70; profAvg = 80; engAvg = 74;
-    }
-
-    const overall = Math.round((techAvg + confAvg + commAvg + probAvg + profAvg + engAvg) / 6);
-
-    return {
-      scores: {
-        overall,
-        technical: techAvg,
-        confidence: confAvg,
-        communication: commAvg,
-        problemSolving: probAvg,
-        professionalism: profAvg,
-        english: engAvg
-      },
-      feedback: {
-        strengths: [
-          'Excellent structural breakdown when answering scenario-based problem-solving questions.',
-          'Demonstrated deep, hands-on understanding of team development protocols and version management.',
-          'Very respectful, structured, and confident communication posture throughout the session.'
-        ],
-        weaknesses: [
-          'Some answers lacked deep metrics or quantitative evidence to back up claims.',
-          'Technical terms were sometimes spoken loosely, showing slight hesitation under pressure.',
-          'Grammar tenses and sentence structure fluctuated slightly in fast dialogue.'
-        ],
-        mistakes: [
-          'Fumbled briefly during the crisis-management scenario, choosing a reactive route before outlining systematic triaging.',
-          'Kept some explanations excessively brief, missing opportunities to highlight architectural patterns.',
-          'Omitted mentioning testing or validation frameworks altogether.'
-        ],
-        suggestions: [
-          'Use the STAR method (Situation, Task, Action, Result) rigorously to structure all behavioral and situational answers.',
-          'Include quantitative metrics (e.g., performance improvements, speed increases, revenue impacts) in every project success story.',
-          'Practice speaking with a slow, continuous rhythm to reduce filler pauses during critical technical questions.',
-          'Engage in specific mock sessions focused strictly on system architectures and unit testing paradigms.'
-        ]
-      }
-    };
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৫. সম্পূর্ণ হিস্ট্রি বিশ্লেষণ করে এডাপ্টিভ মেমোরি জেনারেট করা (Compile consolidated adaptive memory from history)
@@ -616,72 +474,12 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
             lastUpdated: new Date().toISOString()
           };
         }
-      } catch (err) {
-        console.error('Groq compile memory failed, compiling locally:', err);
+        throw new Error('Invalid JSON format from AI');
+      } catch (err: any) {
+        console.error('Groq compile memory failed:', err);
+        throw new Error('Failed to compile memory using AI: ' + err.message);
       }
     }
-
-    // Offline fallback compile memory
-    const allSessions = [latestSession, ...historySessions];
-    const latestScores = latestSession.scores || { overall: 70, technical: 70, communication: 70, confidence: 70, problemSolving: 70, english: 70 };
-    const latestFeedback = latestSession.feedback || { strengths: [], weaknesses: [], mistakes: [], suggestions: [] };
-
-    const weakTopics = latestFeedback.weaknesses.slice(0, 3);
-    const strongTopics = latestFeedback.strengths.slice(0, 3);
-    const previousQuestions = allSessions.flatMap(s => s.qa.map(q => q.question));
-    const previousMistakes = latestFeedback.mistakes;
-    const learningSuggestions = latestFeedback.suggestions;
-
-    const readinessScore = latestScores.overall;
-    const readinessExplanation = `আপনার শেষ ইন্টারভিউয়ের সামগ্রিক পারফর্ম্যান্সের ওপর ভিত্তি করে প্রস্তুতি স্কোর নির্ধারণ করা হয়েছে। টেকনিক্যাল একুরেসি ${latestScores.technical}% এবং কমিউনিকেশন স্কোর ${latestScores.communication}%। দুর্বল ক্ষেত্রগুলো নিয়ে আরও কাজ করলে প্রস্তুতি স্কোর দ্রুত ৯০% স্পর্শ করবে।`;
-
-    return {
-      id: latestSession.id + '_memory',
-      userId,
-      weakTopics,
-      strongTopics,
-      previousQuestions,
-      previousMistakes,
-      improvementHistory: allSessions.map(s => ({
-        sessionId: s.id,
-        date: new Date(s.createdAt).toLocaleDateString(),
-        overallScore: s.scores?.overall || 70,
-        technicalScore: s.scores?.technical || 70,
-        communicationScore: s.scores?.communication || 70
-      })).reverse(),
-      learningSuggestions,
-      readinessExplanation,
-      readinessScore,
-      studyPlan: {
-        todayGoal: `রিভিউ করুন: ${previousMistakes[0] || 'পূর্ববর্তী ইন্টারভিউয়ের ভুলত্রুটিসমূহ'}`,
-        weekGoal: `দুর্বল দিক (${weakTopics.join(', ') || 'টেকনিক্যাল কনসেপ্টস'}) এর ওপর ২ ঘণ্টার থিওরি ও কোডিং প্র্যাকটিস।`,
-        nextInterviewGoal: 'পরবর্তী ইন্টারভিউতে স্কোর ৮০+ এ উন্নীত করা।',
-        practiceTasks: [
-          `STAR মেথড ব্যবহার করে পূর্বের ${weakTopics[0] || 'যেকোনো'} কাজের অভিজ্ঞতা গুছিয়ে লিখুন।`,
-          `ইউনিক চ্যালেঞ্জিং বাগ বা আর্কিটেকচার সリューション নিয়ে ১০ মিনিট কথা বলার রিহার্সাল দিন।`
-        ],
-        miniProjects: [
-          `একটি ছোট স্ক্র্যাচ প্রজেক্ট তৈরি করুন যা ${weakTopics[0] || 'আপনার দুর্বল পার্ট'} এর বাস্তব প্রয়োগ দেখায়।`
-        ],
-        practiceQuestions: [
-          `Can you explain the main architectural patterns used in modern ${latestSession.careerPath} apps?`,
-          `Walk me through your process of debugging a complex memory leak in a large-scale codebase.`
-        ]
-      },
-      metrics: {
-        mostImprovedSkill: latestScores.communication > 75 ? 'Communication Skill' : 'Technical Accuracy',
-        mostDifficultSkill: latestScores.technical < 70 ? 'Technical Concept Deep-dive' : 'Problem Solving Scenarios',
-        mostRepeatedMistake: previousMistakes[0] || 'Explanations fumbling key mechanics',
-        fastestGrowingSkill: 'Interview Fluency & Professional Persona',
-        currentWeakAreas: weakTopics,
-        currentStrongAreas: strongTopics
-      },
-      aiInsights: [
-        `আপনার কমিউনিকেশন দক্ষতা বেশ ভালো (${latestScores.communication}%), যা ইন্টারভিউতে অত্যন্ত ইতিবাচক প্রভাব ফেলছে।`,
-        `${weakTopics[0] || 'টেকনিক্যাল একুরেসি'} বৃদ্ধি করার জন্য নির্দিষ্ট কনসেপ্টে আরও স্টাডি করুন।`,
-        `STAR ফ্রেমওয়ার্ক দিয়ে উত্তর সাজালে বিহেভিওরাল প্রশ্নগুলোর উত্তর অনেক বেশি প্রফেশনাল ও গোছানো শোনায়।`
-      ],
-      lastUpdated: new Date().toISOString()
-    };
+    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   }
 };

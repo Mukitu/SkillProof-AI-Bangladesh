@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { UserProfile, UserSettings } from '../types';
-
 // Supabase মক ক্লায়েন্ট ইমপ্লিমেন্টেশন (Mock Supabase Client Implementation)
 // এটি লাইভ ডেমো এবং প্রিভিউ-তে ডাটাবেজ এবং অথেনটিকেশন সচল রাখার জন্য লোকালস্টোরেজ ব্যবহার করে।
 // (Uses localStorage to simulate Supabase operations in the preview sandbox)
@@ -49,19 +47,49 @@ class SupabaseAuthSimulator {
   }
 
   // বর্তমান সাইন-ইন করা ইউজার (Get current logged in user)
-  getCurrentUser() {
-    const userId = localStorage.getItem('skillproof_current_user_id');
-    if (!userId) return null;
-
-    const cachedUser = localStorage.getItem('skillproof_current_user_object');
-    if (cachedUser) {
+  async getCurrentUser() {
+    if (isRealSupabase && supabaseClient) {
       try {
-        return JSON.parse(cachedUser);
-      } catch (e) {}
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session?.user) return null;
+
+        const { data: profileData, error: profileError } = await supabaseClient
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        if (profileData) {
+          const userProfile: UserProfile = {
+            id: profileData.id,
+            fullName: profileData.full_name,
+            email: profileData.email,
+            phone: profileData.phone || undefined,
+            avatarUrl: profileData.avatar_url || undefined,
+            education: profileData.education || undefined,
+            experience: profileData.experience || undefined,
+            skills: profileData.skills || [],
+            socialLinks: profileData.social_links || undefined,
+            createdAt: profileData.created_at || new Date().toISOString()
+          };
+          return userProfile;
+        }
+        return {
+          id: session.user.id,
+          email: session.user.email || '',
+          fullName: session.user.user_metadata?.full_name || 'User',
+          skills: [],
+          createdAt: session.user.created_at
+        } as UserProfile;
+      } catch (err: any) {
+        console.error('Session fetch error:', err.message);
+        return null;
+      }
     }
-    
-    const profiles = this.getProfiles();
-    return profiles.find(p => p.id === userId) || null;
+    throw new Error('Supabase is not configured.');
   }
 
   // সাইন আপ (Sign Up)
@@ -82,41 +110,6 @@ class SupabaseAuthSimulator {
 
         const user = data.user;
         if (user) {
-          // ১. প্রোফাইল টেবিলে তথ্য সংরক্ষণ করা (Automatically create user profile row)
-          const profileRow = {
-            id: user.id,
-            full_name: fullName,
-            email: email,
-            skills: [],
-            created_at: new Date().toISOString()
-          };
-
-          const { error: profileError } = await supabaseClient
-            .from('profiles')
-            .upsert(profileRow);
-
-          if (profileError) {
-            console.error('Error inserting profiles table in signup:', profileError);
-          }
-
-          // ২. সেটিংস টেবিলে ডিফল্ট তথ্য সংরক্ষণ করা (Create default settings row)
-          const settingsRow = {
-            user_id: user.id,
-            language: 'bn',
-            theme: 'dark',
-            notifications_enabled: true,
-            marketing_emails: false,
-            updated_at: new Date().toISOString()
-          };
-
-          const { error: settingsError } = await supabaseClient
-            .from('user_settings')
-            .upsert(settingsRow);
-
-          if (settingsError) {
-            console.error('Error inserting settings table in signup:', settingsError);
-          }
-
           const userProfile: UserProfile = {
             id: user.id,
             fullName,
@@ -125,10 +118,6 @@ class SupabaseAuthSimulator {
             createdAt: user.created_at || new Date().toISOString()
           };
 
-          // Cache profile locally
-          localStorage.setItem('skillproof_current_user_id', user.id);
-          localStorage.setItem('skillproof_current_user_object', JSON.stringify(userProfile));
-
           const requiresVerification = data.session === null;
           return { data: { user: userProfile, emailVerificationRequired: requiresVerification }, error: null };
         }
@@ -136,63 +125,32 @@ class SupabaseAuthSimulator {
         return { data: { user: null }, error: { message: err.message } };
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    await new Promise(resolve => setTimeout(resolve, 800)); // সিমুলেটেড ডিলে (Network Delay)
-    
-    const profiles = this.getProfiles();
-    if (profiles.some(p => p.email.toLowerCase() === email.toLowerCase())) {
-      return { data: { user: null }, error: { message: 'এই ইমেলটি ইতিমধ্যে নিবন্ধিত হয়েছে (Email already registered)' } };
-    }
-
-    const newId = 'user_' + Math.random().toString(36).substr(2, 9);
-    const newProfile: UserProfile = {
-      id: newId,
-      fullName,
-      email,
-      skills: [],
-      createdAt: new Date().toISOString()
-    };
-
-    profiles.push(newProfile);
-    this.saveProfiles(profiles);
-
-    // ডিফল্ট সেটিংস (Default settings)
-    const settings = this.getSettings();
-    const defaultSettings: UserSettings = {
-      userId: newId,
-      language: 'bn',
-      theme: 'dark',
-      notificationsEnabled: true,
-      marketingEmails: false
-    };
-    settings.push(defaultSettings);
-    this.saveSettings(settings);
-
-    // সরাসরি ইমেইল ভেরিফিকেশনের জন্য ওটিপি স্টোরেজে রাখি (Simulate OTP)
-    localStorage.setItem(`skillproof_otp_${email}`, '123456');
-
-    // Cache user object locally
-    localStorage.setItem('skillproof_current_user_id', newId);
-    localStorage.setItem('skillproof_current_user_object', JSON.stringify(newProfile));
-
-    return { data: { user: newProfile, emailVerificationRequired: true }, error: null };
+    return { data: { user: null }, error: { message: 'Supabase is not configured.' } };
   }
 
   // লগইন (Login)
-  async signIn(email: string) {
+  async signIn(email: string, password?: string) {
     if (isRealSupabase && supabaseClient) {
       try {
+        if (!password) {
+           return { data: { user: null }, error: { message: 'Password is required' } };
+        }
+        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (authError) throw authError;
+
         const { data: profileData, error: profileError } = await supabaseClient
           .from('profiles')
           .select('*')
-          .eq('email', email)
+          .eq('id', authData.user.id)
           .maybeSingle();
 
         if (profileError) throw profileError;
 
         if (!profileData) {
-          return { data: { user: null }, error: { message: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি (User not found)' } };
+          return { data: { user: null }, error: { message: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি (User profile not found)' } };
         }
 
         const userProfile: UserProfile = {
@@ -208,28 +166,12 @@ class SupabaseAuthSimulator {
           createdAt: profileData.created_at || new Date().toISOString()
         };
 
-        // Cache user object locally
-        localStorage.setItem('skillproof_current_user_id', userProfile.id);
-        localStorage.setItem('skillproof_current_user_object', JSON.stringify(userProfile));
-
         return { data: { user: userProfile }, error: null };
       } catch (err: any) {
         return { data: { user: null }, error: { message: err.message } };
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    await new Promise(resolve => setTimeout(resolve, 600));
-    const profiles = this.getProfiles();
-    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
-
-    if (!user) {
-      return { data: { user: null }, error: { message: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি (User not found)' } };
-    }
-
-    localStorage.setItem('skillproof_current_user_id', user.id);
-    localStorage.setItem('skillproof_current_user_object', JSON.stringify(user));
-    return { data: { user }, error: null };
+    return { data: { user: null }, error: { message: 'Supabase is not configured.' } };
   }
 
   // লগআউট (Logout)
@@ -255,32 +197,48 @@ class SupabaseAuthSimulator {
         return { error: { message: err.message } };
       }
     }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const profiles = this.getProfiles();
-    const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
-    
-    if (!user) {
-      return { error: { message: 'এই ইমেলটি সিস্টেমে নিবন্ধিত নেই (Email is not registered)' } };
-    }
-    return { data: { sent: true }, error: null };
+    return { error: { message: 'Supabase is not configured.' } };
   }
 
   // ওটিপি বা ইমেইল ভেরিফাই করা (Simulate OTP/Email Verification)
   async verifyOtp(email: string, code: string) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const expected = localStorage.getItem(`skillproof_otp_${email}`) || '123456';
-    
-    if (code === expected) {
-      const profiles = this.getProfiles();
-      const user = profiles.find(p => p.email.toLowerCase() === email.toLowerCase());
-      if (user) {
-        localStorage.setItem('skillproof_current_user_id', user.id);
-        localStorage.setItem('skillproof_current_user_object', JSON.stringify(user));
-        return { data: { user }, error: null };
+    if (isRealSupabase && supabaseClient) {
+      try {
+        const { data: authData, error: authError } = await supabaseClient.auth.verifyOtp({
+          email,
+          token: code,
+          type: 'signup'
+        });
+        if (authError) throw authError;
+
+        const user = authData.user;
+        if (user) {
+          const { data: profileData } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle();
+
+          const userProfile: UserProfile = {
+            id: user.id,
+            fullName: profileData?.full_name || user.user_metadata?.full_name || 'User',
+            email: user.email || '',
+            phone: profileData?.phone || undefined,
+            avatarUrl: profileData?.avatar_url || undefined,
+            education: profileData?.education || undefined,
+            experience: profileData?.experience || undefined,
+            skills: profileData?.skills || [],
+            socialLinks: profileData?.social_links || undefined,
+            createdAt: profileData?.created_at || user.created_at
+          };
+          return { data: { user: userProfile }, error: null };
+        }
+        return { data: null, error: { message: 'Verification failed.' } };
+      } catch (err: any) {
+        return { data: null, error: { message: err.message } };
       }
     }
-    return { data: null, error: { message: 'ভুল ওটিপি কোড! অনুগ্রহ করে আবার চেষ্টা করুন (Invalid OTP code!)' } };
+    return { data: null, error: { message: 'Supabase is not configured.' } };
   }
 }
 
@@ -346,20 +304,7 @@ class SupabaseDatabaseSimulator {
         return { data: null, error: { message: err.message } };
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const profiles = this.getProfiles();
-    const index = profiles.findIndex(p => p.id === userId);
-
-    if (index === -1) {
-      return { error: { message: 'প্রোফাইল পাওয়া যায়নি' } };
-    }
-
-    profiles[index] = { ...profiles[index], ...updates };
-    this.saveProfiles(profiles);
-    localStorage.setItem('skillproof_current_user_object', JSON.stringify(profiles[index]));
-    return { data: profiles[index], error: null };
+    return { data: null, error: { message: 'Supabase is not configured.' } };
   }
 
   // ইউজার সেটিংস এডিট করা (Update Settings)
@@ -404,26 +349,10 @@ class SupabaseDatabaseSimulator {
         return defaultSettings;
       } catch (err) {
         console.error('Error fetching real settings:', err);
+        throw err;
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    const settings = this.getSettings();
-    const userSetting = settings.find(s => s.userId === userId);
-    
-    if (userSetting) return userSetting;
-
-    // ডিফল্ট সেটিংস যদি না থাকে (Default settings if missing)
-    const newSettings: UserSettings = {
-      userId,
-      language: 'bn',
-      theme: 'dark',
-      notificationsEnabled: true,
-      marketingEmails: false
-    };
-    settings.push(newSettings);
-    this.saveSettings(settings);
-    return newSettings;
+    throw new Error('Supabase is not configured.');
   }
 
   async updateSettings(userId: string, updates: Partial<UserSettings>) {
@@ -458,29 +387,7 @@ class SupabaseDatabaseSimulator {
         return { data: null, error: { message: err.message } };
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const settings = this.getSettings();
-    const index = settings.findIndex(s => s.userId === userId);
-
-    if (index === -1) {
-      const newSettings = {
-        userId,
-        language: 'bn' as const,
-        theme: 'dark' as const,
-        notificationsEnabled: true,
-        marketingEmails: false,
-        ...updates
-      };
-      settings.push(newSettings);
-      this.saveSettings(settings);
-      return { data: newSettings, error: null };
-    }
-
-    settings[index] = { ...settings[index], ...updates };
-    this.saveSettings(settings);
-    return { data: settings[index], error: null };
+    return { data: null, error: { message: 'Supabase is not configured.' } };
   }
 
   // প্রোফাইল পিকচার আপলোড ও ব্যবস্থাপনা (Profile Picture upload, replace and delete in Supabase Storage)
@@ -525,21 +432,11 @@ class SupabaseDatabaseSimulator {
 
         return { success: true, url: publicUrl, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Real Supabase avatar upload failed:', err);
+        console.error('⚠️ Real Supabase avatar upload failed:', err);
         return { success: false, url: null, error: err.message };
       }
     }
-
-    // Sandbox mode: base64 simulated upload
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Url = reader.result as string;
-        await this.updateProfile(userId, { avatarUrl: base64Url });
-        resolve({ success: true, url: base64Url, error: null });
-      };
-      reader.readAsDataURL(file);
-    });
+    return { success: false, url: null, error: 'Supabase is not configured.' };
   }
 
   async deleteProfilePicture(userId: string): Promise<{ success: boolean; error: string | null }> {
@@ -551,9 +448,7 @@ class SupabaseDatabaseSimulator {
         return { success: false, error: err.message };
       }
     }
-
-    await this.updateProfile(userId, { avatarUrl: '' });
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   }
 
   // ডাটা মুছে ফেলা (Delete Account Simulation)
@@ -574,21 +469,7 @@ class SupabaseDatabaseSimulator {
         return { success: false, error: { message: err.message } };
       }
     }
-
-    // --- Sandbox Mode fallback ---
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    let profiles = this.getProfiles();
-    profiles = profiles.filter(p => p.id !== userId);
-    this.saveProfiles(profiles);
-
-    let settings = this.getSettings();
-    settings = settings.filter(s => s.userId !== userId);
-    this.saveSettings(settings);
-
-    localStorage.removeItem('skillproof_current_user_id');
-    localStorage.removeItem('skillproof_current_user_object');
-    return { success: true, error: null };
+    return { success: false, error: { message: 'Supabase is not configured.' } };
   }
 }
 

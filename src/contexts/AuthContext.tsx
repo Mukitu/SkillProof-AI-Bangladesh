@@ -11,7 +11,7 @@ interface AuthContextType {
   user: UserProfile | null;
   settings: UserSettings | null;
   loading: boolean;
-  login: (email: string) => Promise<{ success: boolean; error: string | null }>;
+  login: (email: string, password?: string) => Promise<{ success: boolean; error: string | null }>;
   signup: (email: string, password: string, fullName: string) => Promise<{ success: boolean; verificationRequired: boolean; error: string | null }>;
   logout: () => Promise<void>;
   verifyOtp: (email: string, code: string) => Promise<{ success: boolean; error: string | null }>;
@@ -34,7 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const currentUser = mockAuth.getCurrentUser();
+        const currentUser = await mockAuth.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
           const userSettings = await mockDb.getSettingsByUserId(currentUser.id);
@@ -50,9 +50,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // লগইন হ্যান্ডলার (Login handler)
-  const login = async (email: string) => {
+  const login = async (email: string, password?: string) => {
     setLoading(true);
-    const { data, error } = await mockAuth.signIn(email);
+    const { data, error } = await mockAuth.signIn(email, password);
     if (error) {
       setLoading(false);
       return { success: false, error: error.message };

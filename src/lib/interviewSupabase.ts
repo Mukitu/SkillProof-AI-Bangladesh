@@ -42,7 +42,8 @@ export const interviewDb = {
           .eq('userId', userId)
           .order('createdAt', { ascending: false });
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return data.map((item: any) => ({
             ...item,
             skills: typeof item.skills === 'string' ? JSON.parse(item.skills) : item.skills,
@@ -51,16 +52,13 @@ export const interviewDb = {
             qa: typeof item.qa === 'string' ? JSON.parse(item.qa) : item.qa,
           }));
         }
-        console.warn('⚠️ Supabase interview fetch warning, using local state:', error);
-      } catch (err) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        return [];
+      } catch (err: any) {
+        console.error('⚠️ Database connection failed:', err);
+        throw new Error('Supabase getSessions failed: ' + err.message);
       }
     }
-
-    // স্যান্ডবক্স ফলব্যাক (Sandbox fallback using localStorage)
-    const stored = localStorage.getItem(INTERVIEW_STORAGE_KEY);
-    const list: InterviewSession[] = stored ? JSON.parse(stored) : [];
-    return list.filter(session => session.userId === userId);
+    throw new Error('Supabase is not configured.');
   },
 
   // ৩. সিঙ্গেল ইন্টারভিউ সেশন লোড করা (Get single interview by ID)
@@ -74,7 +72,8 @@ export const interviewDb = {
           .eq('userId', userId)
           .single();
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return {
             ...data,
             skills: typeof data.skills === 'string' ? JSON.parse(data.skills) : data.skills,
@@ -83,15 +82,13 @@ export const interviewDb = {
             qa: typeof data.qa === 'string' ? JSON.parse(data.qa) : data.qa,
           };
         }
-        console.warn('⚠️ Supabase fetch interview by ID warning, using local state:', error);
-      } catch (err) {
-        console.warn('⚠️ Fetch interview by ID error, using local state:', err);
+        return null;
+      } catch (err: any) {
+        console.error('⚠️ Fetch interview by ID error:', err);
+        throw new Error('Supabase getSessionById failed: ' + err.message);
       }
     }
-
-    const stored = localStorage.getItem(INTERVIEW_STORAGE_KEY);
-    const list: InterviewSession[] = stored ? JSON.parse(stored) : [];
-    return list.find(s => s.id === id && s.userId === userId) || null;
+    throw new Error('Supabase is not configured.');
   },
 
   // ৪. ইন্টারভিউ সেশন সংরক্ষণ (Save or Update Interview Session)
@@ -117,19 +114,14 @@ export const interviewDb = {
           .from('interview_sessions')
           .upsert(row, { onConflict: 'id' });
 
-        if (!error) {
-          saveToLocalStorage(session);
-          return { success: true, error: null };
-        }
-        console.warn('⚠️ Supabase interview upsert warning, falling back to local state:', error);
+        if (error) throw error;
+        return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Database interview save failed, falling back to local state:', err);
+        console.error('⚠️ Database interview save failed:', err);
+        return { success: false, error: err.message };
       }
     }
-
-    // স্যান্ডবক্স সংরক্ষণ (Sandbox storage - fallback works seamlessly)
-    saveToLocalStorage(session);
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   },
 
   // ৫. ইন্টারভিউ সেশন মুছে ফেলা (Delete interview from database)
@@ -142,18 +134,14 @@ export const interviewDb = {
           .eq('id', id)
           .eq('userId', userId);
 
-        if (!error) {
-          deleteFromLocalStorage(id);
-          return { success: true, error: null };
-        }
-        console.warn('⚠️ Supabase delete interview warning, using local state:', error);
+        if (error) throw error;
+        return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Delete interview operation failed, using local state:', err);
+        console.error('⚠️ Delete interview operation failed:', err);
+        return { success: false, error: err.message };
       }
     }
-
-    deleteFromLocalStorage(id);
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   },
 
   // ৬. এডাপ্টিভ মেমোরি লোড করা (Load adaptive AI interview memory)
@@ -166,7 +154,8 @@ export const interviewDb = {
           .eq('userId', userId)
           .single();
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return {
             ...data,
             weakTopics: typeof data.weakTopics === 'string' ? JSON.parse(data.weakTopics) : data.weakTopics,
@@ -180,15 +169,13 @@ export const interviewDb = {
             aiInsights: typeof data.aiInsights === 'string' ? JSON.parse(data.aiInsights) : data.aiInsights,
           };
         }
-        console.warn('⚠️ Supabase fetch memory warning, using local state:', error);
-      } catch (err) {
-        console.warn('⚠️ Database connection failed for memory fetch, using local state:', err);
+        return null;
+      } catch (err: any) {
+        console.error('⚠️ Database connection failed for memory fetch:', err);
+        throw new Error('Supabase getMemory failed: ' + err.message);
       }
     }
-
-    // fallback
-    const stored = localStorage.getItem(`${ADAPTIVE_MEMORY_KEY}_${userId}`);
-    return stored ? JSON.parse(stored) : null;
+    throw new Error('Supabase is not configured.');
   },
 
   // ৭. এডাপ্টিভ মেমোরি সংরক্ষণ করা (Save adaptive AI interview memory)
@@ -216,43 +203,13 @@ export const interviewDb = {
           .from('interview_memories')
           .upsert(row, { onConflict: 'id' });
 
-        if (!error) {
-          localStorage.setItem(`${ADAPTIVE_MEMORY_KEY}_${memory.userId}`, JSON.stringify(memory));
-          return { success: true, error: null };
-        }
-        console.warn('⚠️ Supabase memory upsert warning, using local state:', error);
+        if (error) throw error;
+        return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Database memory save failed, using local state:', err);
+        console.error('⚠️ Database memory save failed:', err);
+        return { success: false, error: err.message };
       }
     }
-
-    localStorage.setItem(`${ADAPTIVE_MEMORY_KEY}_${memory.userId}`, JSON.stringify(memory));
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   }
 };
-
-// ==========================================
-// হেল্পার ফাংশনসমূহ (Helper Utilities)
-// ==========================================
-
-function saveToLocalStorage(session: InterviewSession) {
-  const stored = localStorage.getItem(INTERVIEW_STORAGE_KEY);
-  const list: InterviewSession[] = stored ? JSON.parse(stored) : [];
-  const index = list.findIndex(item => item.id === session.id);
-  
-  if (index > -1) {
-    list[index] = session;
-  } else {
-    list.push(session);
-  }
-  localStorage.setItem(INTERVIEW_STORAGE_KEY, JSON.stringify(list));
-}
-
-function deleteFromLocalStorage(id: string) {
-  const stored = localStorage.getItem(INTERVIEW_STORAGE_KEY);
-  if (stored) {
-    let list: InterviewSession[] = JSON.parse(stored);
-    list = list.filter(item => item.id !== id);
-    localStorage.setItem(INTERVIEW_STORAGE_KEY, JSON.stringify(list));
-  }
-}

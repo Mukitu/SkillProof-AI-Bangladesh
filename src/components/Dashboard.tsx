@@ -707,6 +707,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   {isEditingProfile ? (
                     <Card className="bg-white dark:bg-slate-900">
                       <form onSubmit={handleProfileSave} className="flex flex-col gap-5">
+                        
+                        <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+                          <img 
+                            src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
+                            alt="Avatar" 
+                            className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200 dark:border-slate-800" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <div className="flex flex-col gap-2 w-full">
+                            <label className="text-xs font-semibold text-slate-500">{isBn ? 'প্রোফাইল ছবি পরিবর্তন করুন' : 'Change Profile Picture'}</label>
+                            <div className="flex flex-wrap gap-2 items-center">
+                              <input 
+                                type="file" 
+                                accept="image/*"
+                                id="avatarUpload"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  setUploadingAvatar(true);
+                                  const { success, error } = await uploadProfilePicture(file);
+                                  setUploadingAvatar(false);
+                                  if (!success) alert(error || 'Failed to upload picture');
+                                }}
+                              />
+                              <Button 
+                                variant="outline" 
+                                type="button" 
+                                size="sm" 
+                                disabled={uploadingAvatar}
+                                onClick={() => document.getElementById('avatarUpload')?.click()}
+                              >
+                                {uploadingAvatar ? (isBn ? 'আপলোড হচ্ছে...' : 'Uploading...') : (isBn ? 'নতুন ছবি আপলোড' : 'Upload New Picture')}
+                              </Button>
+                              {user?.avatarUrl && (
+                                <Button 
+                                  variant="ghost" 
+                                  type="button" 
+                                  size="sm"
+                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                                  onClick={async () => {
+                                    if(confirm(isBn ? 'আপনি কি নিশ্চিত?' : 'Are you sure?')) {
+                                      await deleteProfilePicture();
+                                    }
+                                  }}
+                                >
+                                  {isBn ? 'ছবি মুছুন' : 'Remove Picture'}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="grid md:grid-cols-2 gap-5">
                           <div className="flex flex-col gap-1.5">
                             <label className="text-xs font-semibold text-slate-500">{t('authFullName')}</label>

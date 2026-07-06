@@ -48,13 +48,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     e.preventDefault();
     resetFormState();
 
-    if (!email) {
-      setErrorMsg(isBn ? 'অনুগ্রহ করে আপনার ইমেল লিখুন' : 'Please enter your email');
+    if (!email || !password) {
+      setErrorMsg(isBn ? 'অনুগ্রহ করে আপনার ইমেল ও পাসওয়ার্ড লিখুন' : 'Please enter your email and password');
       return;
     }
 
     setIsLoading(true);
-    const res = await login(email);
+    const res = await login(email, password);
     setIsLoading(false);
 
     if (res.success) {

@@ -49,7 +49,8 @@ export const cvDb = {
           .eq('userId', userId)
           .order('updatedAt', { ascending: false });
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           // সুপাবেজে প্রতি সারিতে JSON আকারে সম্পূর্ণ অবজেক্টও থাকতে পারে
           return data.map((item: any) => ({
             ...item,
@@ -62,16 +63,13 @@ export const cvDb = {
             feedback: typeof item.feedback === 'string' ? JSON.parse(item.feedback) : item.feedback,
           }));
         }
-        console.warn('⚠️ Supabase fetch warning, using local state:', error);
-      } catch (err) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        return [];
+      } catch (err: any) {
+        console.error('⚠️ Database connection failed:', err);
+        throw new Error('Supabase getResumes failed: ' + err.message);
       }
     }
-
-    // স্যান্ডবক্স ফলব্যাক (Sandbox fallback using localStorage)
-    const stored = localStorage.getItem(CV_STORAGE_KEY);
-    const list: CvData[] = stored ? JSON.parse(stored) : [];
-    return list.filter(cv => cv.userId === userId);
+    throw new Error('Supabase is not configured.');
   },
 
   // ৩. সিঙ্গেল সিভি লোড করা (Get single CV by ID)
@@ -85,7 +83,8 @@ export const cvDb = {
           .eq('userId', userId)
           .single();
 
-        if (!error && data) {
+        if (error) throw error;
+        if (data) {
           return {
             ...data,
             personalInfo: typeof data.personalInfo === 'string' ? JSON.parse(data.personalInfo) : data.personalInfo,
@@ -97,15 +96,13 @@ export const cvDb = {
             feedback: typeof data.feedback === 'string' ? JSON.parse(data.feedback) : data.feedback,
           };
         }
-        console.warn('⚠️ Supabase fetch by ID warning, using local state:', error);
-      } catch (err) {
-        console.warn('⚠️ Fetch resume by ID error, using local state:', err);
+        return null;
+      } catch (err: any) {
+        console.error('⚠️ Fetch resume by ID error:', err);
+        throw new Error('Supabase getResumeById failed: ' + err.message);
       }
     }
-
-    const stored = localStorage.getItem(CV_STORAGE_KEY);
-    const list: CvData[] = stored ? JSON.parse(stored) : [];
-    return list.find(cv => cv.id === id && cv.userId === userId) || null;
+    throw new Error('Supabase is not configured.');
   },
 
   // ৪. সিভি সংরক্ষণ বা অটোসেভ (Save or Auto-Save CV to database)
@@ -140,20 +137,14 @@ export const cvDb = {
           .from('cv_resumes')
           .upsert(row, { onConflict: 'id' });
 
-        if (!error) {
-          // লোকাল কপিও রিফ্রেশ রাখি যেন দ্রুত রেসপন্স পাওয়া যায় (Also update local cache for instant updates)
-          saveToLocalStorage(updatedCv);
-          return { success: true, error: null };
-        }
-        console.warn('⚠️ Supabase upsert error, falling back to local state:', error);
+        if (error) throw error;
+        return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Database save operation failed, falling back to local state:', err);
+        console.error('⚠️ Database save operation failed:', err);
+        return { success: false, error: err.message };
       }
     }
-
-    // স্যান্ডবক্স সংরক্ষণ (Sandbox storage - fallback works seamlessly)
-    saveToLocalStorage(updatedCv);
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   },
 
   // ৫. সিভি মুছে ফেলা (Delete CV from database)
@@ -166,18 +157,14 @@ export const cvDb = {
           .eq('id', id)
           .eq('userId', userId);
 
-        if (!error) {
-          deleteFromLocalStorage(id);
-          return { success: true, error: null };
-        }
-        console.warn('⚠️ Supabase delete error, using local state:', error);
+        if (error) throw error;
+        return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Delete operation failed, using local state:', err);
+        console.error('⚠️ Delete operation failed:', err);
+        return { success: false, error: err.message };
       }
     }
-
-    deleteFromLocalStorage(id);
-    return { success: true, error: null };
+    return { success: false, error: 'Supabase is not configured.' };
   },
 
   // ৬. ফাইলের মেটাডাটা সংরক্ষণ এবং আপলোড (File Storage & Metadata save)
@@ -260,66 +247,26 @@ export const cvDb = {
           error: null
         };
       } catch (err: any) {
-        console.warn('⚠️ Real Supabase upload failed, falling back to local sandbox storage:', err);
+        console.error('⚠️ Supabase upload failed:', err);
+        return { success: false, url: null, fileName: '', fileSize: 0, error: err.message };
       }
     }
-
-    // স্যান্ডবক্স মোডে লোকাল ইউআরএল দিয়ে ফাইল সিমুলেট করা (Simulate files in local sandbox)
-    const simulatedUrl = `blob:skillproof_sandbox_bucket/${filePath}`;
-    const newMeta = {
-      id: Math.random().toString(36).substr(2, 9),
-      userId,
-      fileName: file.name,
-      fileSize: file.size,
-      fileUrl: simulatedUrl,
-      uploadedAt: new Date().toISOString()
-    };
-
-    const storedMetas = localStorage.getItem(FILES_STORAGE_KEY);
-    const metasList = storedMetas ? JSON.parse(storedMetas) : [];
-    metasList.push(newMeta);
-    localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(metasList));
-
-    // ফাইল রিড করা এবং স্টোর করা (আমরা ফাইলটিকে বেস-৬৪ এ কনভার্ট করে লোকালস্টোরেজে রাখতে পারি সিমুলেশনের জন্য)
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        try {
-          localStorage.setItem(`skillproof_cv_file_${newMeta.id}`, reader.result as string);
-        } catch (e) {
-          console.warn('File too large for localStorage, skipping content save. Metadata preserved.');
-        }
-        resolve({
-          success: true,
-          url: simulatedUrl,
-          fileName: file.name,
-          fileSize: file.size,
-          error: null
-        });
-      };
-      reader.readAsDataURL(file);
-    });
+    return { success: false, url: null, fileName: '', fileSize: 0, error: 'Supabase is not configured.' };
   },
 
   // ৭. সিভি ইমপ্রুভমেন্ট হিস্ট্রি ট্র্যাক করা (Save CV Improvement History)
   saveImprovementHistory: async (history: CvImprovementHistory): Promise<void> => {
     if (isRealSupabase) {
       try {
-        await supabaseClient.from('cv_improvement_history').upsert(history);
-      } catch (err) {
+        const { error } = await supabaseClient.from('cv_improvement_history').upsert(history);
+        if (error) throw error;
+      } catch (err: any) {
         console.error('History save failed on Supabase:', err);
+        throw new Error('Supabase saveImprovementHistory failed: ' + err.message);
       }
-    }
-
-    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-    const list: CvImprovementHistory[] = stored ? JSON.parse(stored) : [];
-    const index = list.findIndex(h => h.id === history.id);
-    if (index > -1) {
-      list[index] = history;
     } else {
-      list.push(history);
+      throw new Error('Supabase is not configured.');
     }
-    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(list));
   },
 
   getImprovementHistory: async (cvId: string): Promise<CvImprovementHistory[]> => {
@@ -329,40 +276,13 @@ export const cvDb = {
           .from('cv_improvement_history')
           .select('*')
           .eq('cvId', cvId);
-        if (!error && data) return data;
-      } catch (err) {
+        if (error) throw error;
+        return data || [];
+      } catch (err: any) {
         console.error('Get history from Supabase failed:', err);
+        throw new Error('Supabase getImprovementHistory failed: ' + err.message);
       }
     }
-
-    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
-    const list: CvImprovementHistory[] = stored ? JSON.parse(stored) : [];
-    return list.filter(h => h.cvId === cvId);
+    throw new Error('Supabase is not configured.');
   }
 };
-
-// ==========================================
-// হেল্পার ফাংশনসমূহ (Helper Utilities)
-// ==========================================
-
-function saveToLocalStorage(cv: CvData) {
-  const stored = localStorage.getItem(CV_STORAGE_KEY);
-  const list: CvData[] = stored ? JSON.parse(stored) : [];
-  const index = list.findIndex(item => item.id === cv.id);
-  
-  if (index > -1) {
-    list[index] = cv;
-  } else {
-    list.push(cv);
-  }
-  localStorage.setItem(CV_STORAGE_KEY, JSON.stringify(list));
-}
-
-function deleteFromLocalStorage(id: string) {
-  const stored = localStorage.getItem(CV_STORAGE_KEY);
-  if (stored) {
-    let list: CvData[] = JSON.parse(stored);
-    list = list.filter(item => item.id !== id);
-    localStorage.setItem(CV_STORAGE_KEY, JSON.stringify(list));
-  }
-}
