@@ -1,0 +1,223 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Sophisticated Dark Theme Color Accents */
+  --color-brand-green: #10b981;
+  --color-brand-blue: #06b6d4;
+  --color-brand-purple: #8b5cf6;
+  --color-glass-dark: rgba(9, 9, 9, 0.85);
+  --color-glass-light: rgba(255, 255, 255, 0.05);
+
+  /* Remapping all slate colors to the precise hex values of the "Sophisticated Dark" Design */
+  --color-slate-50: #050505;
+  --color-slate-100: #111111;
+  --color-slate-200: #1e1e1e;
+  --color-slate-300: #2d2d2d;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #0c0c0c;
+  --color-slate-900: #090909;
+  --color-slate-950: #050505;
+
+  /* Animation Utilities */
+  --animate-shimmer: shimmer 2s infinite linear;
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Base Body Styles for Sophisticated Dark theme */
+html, body {
+  background-color: #050505 !important;
+  color: #f1f5f9 !important;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Force dark mode background on any container using slate-50 or bg-white in light/dark transitions */
+.bg-white, .bg-slate-50 {
+  background-color: #050505 !important;
+}
+
+.text-slate-800, .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+/* Premium Card & Glass Panel Styling */
+.glass-panel {
+  background: rgba(12, 12, 12, 0.85) !important;
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Precise Mockup Shadows and Glow Effects */
+.glow-green, .glow-emerald {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+}
+
+.glow-purple {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);
+}
+
+/* Hover effects matching bento cards exactly */
+.hover-card-emerald:hover {
+  border-color: rgba(16, 185, 129, 0.3) !important;
+}
+
+.hover-card-cyan:hover {
+  border-color: rgba(6, 182, 212, 0.3) !important;
+}
+
+.hover-card-purple:hover {
+  border-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+/* Custom Scrollbars in Sophisticated Style */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Inputs, Textareas, and Select Fields Overrides */
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
+  background-color: #111111 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
+  border-color: rgba(16, 185, 129, 0.5) !important;
+  outline: none !important;
+}
+
+.technical-label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+/* =========================================================
+   PRINT-READY AND TEMPLATE-SPECIFIC OVERRIDES
+   ========================================================= */
+
+/* Prevent Dark theme overrides inside CV preview and print renders */
+#cv-preview-render, #cv-preview-render *, 
+#cv-print-area, #cv-print-area *,
+.print-area, .print-area * {
+  background-color: transparent !important;
+  color: inherit !important;
+}
+
+#cv-preview-render, #cv-print-area {
+  background-color: #ffffff !important;
+  color: #1e293b !important;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+}
+
+#cv-preview-render h1, #cv-preview-render h2, #cv-preview-render h3, #cv-preview-render h4,
+#cv-print-area h1, #cv-print-area h2, #cv-print-area h3, #cv-print-area h4 {
+  color: #0f172a !important;
+}
+
+#cv-preview-render .text-emerald-600, #cv-print-area .text-emerald-600 {
+  color: #059669 !important;
+}
+
+#cv-preview-render .text-purple-900, #cv-print-area .text-purple-900 {
+  color: #581c87 !important;
+}
+
+#cv-preview-render .text-purple-700, #cv-print-area .text-purple-700 {
+  color: #7e22ce !important;
+}
+
+#cv-preview-render .text-purple-400, #cv-print-area .text-purple-400 {
+  color: #c084fc !important;
+}
+
+#cv-preview-render .bg-purple-100, #cv-print-area .bg-purple-100 {
+  background-color: #f3e8ff !important;
+}
+
+#cv-preview-render .bg-slate-50, #cv-print-area .bg-slate-50 {
+  background-color: #f8fafc !important;
+}
+
+#cv-preview-render .bg-slate-100, #cv-print-area .bg-slate-100 {
+  background-color: #f1f5f9 !important;
+}
+
+#cv-preview-render hr, #cv-print-area hr {
+  border-color: #cbd5e1 !important;
+}
+
+/* Print Stylesheet */
+@media print {
+  /* Hide all elements on the page except the resume container */
+  body, html {
+    background: #ffffff !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+  
+  #cv-print-area, #cv-print-area * {
+    visibility: visible !important;
+  }
+  
+  #cv-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 210mm !important; /* Standard A4 Width */
+    height: 297mm !important; /* Standard A4 Height */
+    margin: 0 !important;
+    padding: 20mm !important;
+    background: #ffffff !important;
+    color: #1e293b !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+}
+
