@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -22,6 +22,9 @@ import { AiInterview } from './AiInterview';
 import { AiSkillPassport } from './AiSkillPassport';
 import { AiCareerGrowth } from './AiCareerGrowth';
 import { AiReports } from './AiReports';
+import { cvDb } from '../lib/cvSupabase';
+import { interviewDb } from '../lib/interviewSupabase';
+import { passportDb } from '../lib/passportSupabase';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -56,57 +59,125 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
   // মোডাল/ডায়ালগ স্টেট (Delete confirmation state)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // ডাইনামিক স্ট্যাটস এবং অ্যাক্টিভিটি স্টেটসমূহ (Dynamic Dashboard Stats)
+  const [stats, setStats] = useState({
+    avgScore: 0,
+    totalCvs: 0,
+    totalInterviews: 0,
+    totalBadges: 0,
+    growthRate: 0
+  });
+  const [dynamicActivities, setDynamicActivities] = useState<any[]>([]);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  // ডাইনামিক ড্যাশবোর্ড ডেটা লোড করার সিস্টেম (Load actual user metrics from stores)
+  const loadDashboardData = async () => {
+    if (!user) return;
+    setLoadingStats(true);
+    try {
+      // ১. সিভি ডাটা লোড
+      const resumesList = await cvDb.getResumes(user.id);
+      
+      // ২. ইন্টারভিউ সেশনস লোড
+      const sessionsList = await interviewDb.getSessions(user.id);
+      const completedSessions = sessionsList.filter(s => s.status === 'completed');
+      
+      // ৩. স্কিলস ও পাসপোর্ট লোড
+      const passportSkills = await passportDb.getSkillsByUserId(user.id);
+      
+      // ৪. গড় স্কোর হিসাব
+      const totalScoreSum = completedSessions.reduce((acc, curr) => acc + (curr.scores?.overall || 0), 0);
+      const avgScore = completedSessions.length > 0 ? Math.round(totalScoreSum / completedSessions.length) : 0;
+      
+      // ৫. ব্যাজ হিসাব (Verified skills are Gold, Platinum or Expert)
+      const verifiedBadgesCount = passportSkills.filter(s => s.verificationStatus === 'Verified' || s.score >= 55).length;
+      
+      setStats({
+        avgScore,
+        totalCvs: resumesList.length,
+        totalInterviews: sessionsList.length,
+        totalBadges: verifiedBadgesCount,
+        growthRate: completedSessions.length > 1 ? Math.min(15, completedSessions.length * 4) : 0
+      });
+
+      // ৬. ডাইনামিক অ্যাক্টিভিটি টাইমলাইন তৈরি (Build dynamic activity logs)
+      const list: any[] = [];
+      
+      // সিভিসমূহ যোগ করি
+      resumesList.forEach((cv, idx) => {
+        list.push({
+          id: `cv_${cv.id}_${idx}`,
+          type: 'cv_uploaded',
+          titleBn: 'সিভি আপলোড সম্পন্ন',
+          titleEn: 'CV Upload completed',
+          detailBn: `${cv.personalInfo.name || 'Untitled'} রেজুমেটি এআই দ্বারা এনালাইসিস করা হয়েছে।`,
+          detailEn: `CV for ${cv.personalInfo.name || 'Untitled'} has been analyzed by AI.`,
+          time: new Date(cv.updatedAt).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US'),
+          score: cv.scores?.atsScore,
+          timestamp: new Date(cv.updatedAt).getTime()
+        });
+      });
+      
+      // ভাইভা সেশনস যোগ করি
+      sessionsList.forEach((s, idx) => {
+        list.push({
+          id: `int_${s.id}_${idx}`,
+          type: 'interview_completed',
+          titleBn: `${s.careerPath} ভাইভা সম্পন্ন`,
+          titleEn: `${s.careerPath} Viva completed`,
+          detailBn: s.status === 'completed' 
+            ? `প্রশ্নোত্তরের পারফরম্যান্স স্কোর: ${s.scores?.overall || 0}%`
+            : `ভাইভা প্রস্তুতি সম্পন্ন হয়েছে, অংশগ্রহণের অপেক্ষায়।`,
+          detailEn: s.status === 'completed'
+            ? `Performance score in Q&A session: ${s.scores?.overall || 0}%`
+            : `Viva preparation set up, awaiting participation.`,
+          time: new Date(s.createdAt).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US'),
+          score: s.scores?.overall,
+          timestamp: new Date(s.createdAt).getTime()
+        });
+      });
+      
+      // স্কিল পাসপোর্ট ব্যাজ অর্জন যোগ করি
+      passportSkills.forEach((skill, idx) => {
+        if (skill.score >= 40) {
+          const dateStr = skill.lastAssessmentDate || new Date().toISOString();
+          list.push({
+            id: `badge_${skill.id}_${idx}`,
+            type: 'badge_earned',
+            titleBn: `${skill.skillName} ব্যাজ অর্জন`,
+            titleEn: `${skill.skillName} Badge earned`,
+            detailBn: `${skill.level} লেভেল ভেরিফাইড প্রফেশনাল ব্যাজ।`,
+            detailEn: `Verified ${skill.level} level professional badge.`,
+            time: new Date(dateStr).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US'),
+            score: skill.score,
+            timestamp: new Date(dateStr).getTime()
+          });
+        }
+      });
+
+      // টাইমস্ট্যাম্প অনুযায়ী সাজাই (Sort descending by timestamp)
+      const sorted = list.sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
+      setDynamicActivities(sorted);
+    } catch (err) {
+      console.error('Error loading dashboard stats:', err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [user, activeTab]);
+
   // নোটিফিকেশন মক ডাটা (Mock Notification Data)
   const notifications = [
     {
       id: '1',
       titleBn: 'নতুন এআই ভাইভা উপলব্ধ!',
       titleEn: 'New AI Interview available!',
-      descBn: 'আপনার প্রোফাইলের ওপর ভিত্তি করে "React Developer" মৌখিক পরীক্ষা তৈরি করা হয়েছে।',
-      descEn: 'Based on your profile, a "React Developer" viva has been generated.',
+      descBn: 'আপনার প্রোফাইলের ওপর ভিত্তি করে ভাইভা কাস্টমাইজ করা হয়েছে।',
+      descEn: 'Based on your profile, viva questions have been customized.',
       time: '৫ মিনিট আগে'
-    },
-    {
-      id: '2',
-      titleBn: 'স্কিল পাসপোর্ট আপডেট হয়েছে',
-      titleEn: 'Skill Passport Updated',
-      descBn: 'আপনার টাইপস্ক্রিপ্ট দক্ষতার ভেরিফাইড ব্যাজটি পাসপোর্টে যোগ করা হয়েছে।',
-      descEn: 'Your verified TypeScript Intermediate Badge has been added to your passport.',
-      time: '২ ঘন্টা আগে'
-    }
-  ];
-
-  // রিসেন্ট অ্যাক্টিভিটি মক ডাটা (Mock Activity History)
-  const activities = [
-    {
-      id: '1',
-      type: 'cv_uploaded',
-      titleBn: 'সিভি আপলোড সম্পন্ন হয়েছে',
-      titleEn: 'CV Upload completed',
-      detailBn: 'Ariful_CV_MERN.pdf ফাইলটি এআই এনালাইসিস করা হয়েছে।',
-      detailEn: 'Ariful_CV_MERN.pdf has been analyzed by AI.',
-      time: '৩ দিন আগে',
-      score: 82
-    },
-    {
-      id: '2',
-      type: 'interview_completed',
-      titleBn: 'রিয়্যাক্ট ভাইভা সম্পন্ন',
-      titleEn: 'React Viva completed',
-      detailBn: 'প্রশ্নোত্তরের পারফরম্যান্স স্কোর: ৭৮%',
-      detailEn: 'Performance score in Q&A session: 78%',
-      time: '৪ দিন আগে',
-      score: 78
-    },
-    {
-      id: '3',
-      type: 'badge_earned',
-      titleBn: 'টাইপস্ক্রিপ্ট ব্যাজ অর্জন',
-      titleEn: 'TypeScript Badge earned',
-      detailBn: 'ইন্টারমিডিয়েট লেভেল ভেরিফাইড ব্যাজ।',
-      detailEn: 'Verified Intermediate level badge.',
-      time: '৫ দিন আগে',
-      score: 100
     }
   ];
 
@@ -361,29 +432,29 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <StatsCard 
                       title={t('statTitleOverall')}
-                      value="78%" 
-                      subtext={isBn ? 'বিগত পরীক্ষাগুলোর গড়' : 'Average score'} 
-                      trend={{ value: "+2.5%", isPositive: true }} 
-                      icon={<Cpu className="w-5 h-5" />}
+                      value={stats.avgScore > 0 ? `${stats.avgScore}%` : '0%'} 
+                      subtext={isBn ? 'বিগত পরীক্ষাগুলোর গড় স্কোর' : 'Average score of mock vivas'} 
+                      trend={stats.avgScore > 0 ? { value: "+2.5%", isPositive: true } : undefined} 
+                      icon={<Cpu className="w-5 h-5 text-purple-500" />}
                     />
                     <StatsCard 
                       title={t('statTitleInterviews')}
-                      value="03" 
-                      subtext={isBn ? '১টি প্রক্রিয়াদীন' : '1 pending approval'} 
-                      icon={<Video className="w-5 h-5" />}
+                      value={stats.totalInterviews.toString().padStart(2, '0')} 
+                      subtext={isBn ? 'মোট তৈরি ইন্টারভিউ সেশন' : 'Total interview sessions'} 
+                      icon={<Video className="w-5 h-5 text-cyan-500" />}
                     />
                     <StatsCard 
                       title={t('statTitleBadges')}
-                      value="02" 
-                      subtext={isBn ? '১টি সিলভার, ১টি গোল্ড' : '1 silver, 1 gold'} 
-                      icon={<Award className="w-5 h-5" />}
+                      value={stats.totalBadges.toString().padStart(2, '0')} 
+                      subtext={isBn ? 'অর্জিত স্কিল ব্যাজ পাসপোর্ট' : 'Acquired skill badges'} 
+                      icon={<Award className="w-5 h-5 text-emerald-500" />}
                     />
                     <StatsCard 
                       title={t('statTitleProgress')}
-                      value="+12%" 
-                      subtext={isBn ? 'এই সপ্তাহের বৃদ্ধি' : 'Growth this week'} 
-                      trend={{ value: "+4.1%", isPositive: true }} 
-                      icon={<BarChart3 className="w-5 h-5" />}
+                      value={stats.growthRate > 0 ? `+${stats.growthRate}%` : '0%'} 
+                      subtext={isBn ? 'দক্ষতা বৃদ্ধির সূচক' : 'Overall career progress index'} 
+                      trend={stats.growthRate > 0 ? { value: `+${stats.growthRate}%`, isPositive: true } : undefined} 
+                      icon={<BarChart3 className="w-5 h-5 text-yellow-500" />}
                     />
                   </div>
 
@@ -504,29 +575,53 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   <Card className="flex flex-col gap-4">
                     <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
                       <h4 className="font-display font-bold text-slate-900 dark:text-white">{t('recentActivity')}</h4>
-                      <span className="text-xs font-semibold text-slate-400">{isBn ? '৩টি রেকর্ড' : '3 records found'}</span>
+                      <span className="text-xs font-semibold text-slate-400">
+                        {isBn 
+                          ? `${dynamicActivities.length}টি কার্যক্রম পাওয়া গেছে` 
+                          : `${dynamicActivities.length} records found`}
+                      </span>
                     </div>
 
                     <div className="flex flex-col gap-4">
-                      {activities.map((act) => (
-                        <div key={act.id} className="flex justify-between items-start p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all">
-                          <div className="flex items-start gap-3">
-                            <div className="h-9 w-9 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
-                              {act.type === 'cv_uploaded' && <FileText className="w-4 h-4" />}
-                              {act.type === 'interview_completed' && <Video className="w-4 h-4" />}
-                              {act.type === 'badge_earned' && <Award className="w-4 h-4" />}
-                            </div>
-                            <div>
-                              <h5 className="text-sm font-bold text-slate-900 dark:text-white">{isBn ? act.titleBn : act.titleEn}</h5>
-                              <p className="text-xs text-slate-500 mt-1">{isBn ? act.detailBn : act.detailEn}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
-                            {act.score && <Badge variant={act.score > 80 ? 'brand' : 'info'}>{act.score}%</Badge>}
-                          </div>
+                      {loadingStats ? (
+                        <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
+                          {isBn ? 'কার্যক্রম লোড হচ্ছে...' : 'Loading recent activities...'}
                         </div>
-                      ))}
+                      ) : dynamicActivities.length > 0 ? (
+                        dynamicActivities.map((act) => (
+                          <div key={act.id} className="flex justify-between items-start p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all">
+                            <div className="flex items-start gap-3">
+                              <div className="h-9 w-9 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
+                                {act.type === 'cv_uploaded' && <FileText className="w-4 h-4 text-emerald-500" />}
+                                {act.type === 'interview_completed' && <Video className="w-4 h-4 text-cyan-500" />}
+                                {act.type === 'badge_earned' && <Award className="w-4 h-4 text-purple-500" />}
+                              </div>
+                              <div>
+                                <h5 className="text-sm font-bold text-slate-900 dark:text-white">{isBn ? act.titleBn : act.titleEn}</h5>
+                                <p className="text-xs text-slate-500 mt-1">{isBn ? act.detailBn : act.detailEn}</p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
+                              {act.score !== undefined && act.score > 0 && (
+                                <Badge variant={act.score > 80 ? 'brand' : 'info'}>{act.score}%</Badge>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                          <AlertCircle className="w-8 h-8 text-slate-500" />
+                          <p className="text-xs text-slate-400 font-bold">
+                            {isBn ? 'এখনো কোনো কার্যক্রম পাওয়া যায়নি।' : 'No activity recorded yet.'}
+                          </p>
+                          <p className="text-[10px] text-slate-500 max-w-sm px-4">
+                            {isBn 
+                              ? 'আপনার প্রথম লাইভ মক ভাইভা শুরু করতে ড্যাশবোর্ড থেকে "এআই সিভি এডিটর" মডিউলে একটি নতুন রেজুমে তৈরি করুন।' 
+                              : 'To get started, please build or upload a resume using the AI Smart CV module.'}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </Card>
                 </div>

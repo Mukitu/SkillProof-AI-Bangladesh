@@ -73,7 +73,22 @@ export const reportsDb = {
       // রিয়েল ডাটা সোর্সসমূহ রিড করা (Fetch real data sources)
       const resumes = await cvDb.getResumes(userId);
       const interviews = await interviewDb.getSessions(userId);
-      const passport = await passportDb.getPassportByUserId(userId, 'আরিফুল ইসলাম');
+      
+      let userFullName = 'User';
+      const storedProfiles = localStorage.getItem('skillproof_profiles');
+      if (storedProfiles) {
+        try {
+          const profiles = JSON.parse(storedProfiles);
+          const userProf = profiles.find((p: any) => p.id === userId);
+          if (userProf) {
+            userFullName = userProf.fullName;
+          }
+        } catch (e) {
+          console.error('Error parsing profiles for report sync:', e);
+        }
+      }
+
+      const passport = await passportDb.getPassportByUserId(userId, userFullName);
       const skills = await passportDb.getSkillsByUserId(userId);
       const passportHistory = await passportDb.getHistoryByUserId(userId);
       const careerGrowth = await growthDb.getCareerGrowth(userId);

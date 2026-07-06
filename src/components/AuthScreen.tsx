@@ -284,26 +284,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     {t('login')}
                   </Button>
 
-                  <div className="relative flex py-2 items-center">
-                    <div className="flex-grow border-t border-slate-100 dark:border-slate-800"></div>
-                    <span className="flex-shrink mx-4 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{t('or')}</span>
-                    <div className="flex-grow border-t border-slate-100 dark:border-slate-800"></div>
-                  </div>
-
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    className="py-3" 
-                    onClick={() => {
-                      // ডেমো অ্যাকাউন্টে সরাসরি লগইন
-                      setEmail('nishat.af27@gmail.com');
-                      setPassword('123456');
-                    }}
-                  >
-                    <Sparkles className="w-4 h-4 text-brand-green" />
-                    <span>{isBn ? 'মক/ডেমো ক্রেডেনশিয়াল ফিল করুন' : 'Auto Fill Demo User'}</span>
-                  </Button>
-
                   <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-4">
                     {isBn ? 'অ্যাকাউন্ট নেই?' : "Don't have an account?"}{' '}
                     <button 

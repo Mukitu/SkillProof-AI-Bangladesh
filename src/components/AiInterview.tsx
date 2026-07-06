@@ -11,7 +11,8 @@ import {
   Clock, Award, BookOpen, TrendingUp, Sparkles, Timer, 
   ChevronDown, User, Mail, Phone, MapPin, Calendar, 
   ChevronUp, Trash2, History, BarChart3, PieChart, 
-  HelpCircle, Activity, Info, Brain, ShieldAlert, Check
+  HelpCircle, Activity, Info, Brain, ShieldAlert, Check,
+  FileText, LayoutDashboard
 } from 'lucide-react';
 import { Card, Button, Badge } from './UI';
 import { cvDb } from '../lib/cvSupabase';
@@ -141,10 +142,8 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
         setSelectedCv(cvList[0]);
         analyzeCvData(cvList[0]);
       } else {
-        // সিভি না থাকলে ডেমো সিভি তৈরি করে টেস্ট করার সুযোগ দেওয়া
-        const mockCv = getDemoCv();
-        setSelectedCv(mockCv);
-        analyzeCvData(mockCv);
+        setSelectedCv(null);
+        setAnalysis(null);
       }
     } catch (err) {
       console.error('Error loading resumes:', err);
@@ -1140,230 +1139,256 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
 
           {/* ট্যাব ২: সিভি সেটআপ এবং নতুন সেশন আরম্ভ (অথবা কোনো হিস্ট্রি না থাকলে ডিফল্ট শো) */}
           {(homeTab === 'setup' || historySessions.length === 0) && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              
-              {/* বাম কলাম: ক্যান্ডিডেট প্রোফাইল ও সিভি নির্বাচন */}
-              <div className="lg:col-span-5 flex flex-col gap-6">
-                <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md">
-                  <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
-                    <User className="w-5 h-5 text-emerald-500" />
-                    {isBn ? 'প্রার্থীর তথ্য ও সিভি' : 'Candidate & CV Information'}
-                  </h3>
+            resumes.length === 0 ? (
+              <Card className="max-w-3xl mx-auto border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md text-center p-12 my-6">
+                <div className="h-16 w-16 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center mx-auto mb-6 border border-amber-500/20">
+                  <FileText className="w-8 h-8" />
+                </div>
+                <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white mb-3">
+                  {isBn ? 'কোনো জীবনবৃত্তান্ত (CV) পাওয়া যায়নি!' : 'No Active CV/Resume Found!'}
+                </h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-lg mx-auto leading-relaxed mb-8">
+                  {isBn 
+                    ? 'এআই লাইভ ভাইভা ইন্টারেক্টিভ কাস্টমাইজড প্রশ্নগুলো তৈরি করতে আপনার জীবনবৃত্তান্তের তথ্য প্রয়োজন। দয়া করে প্রথমে "এআই সিভি এডিটর" সেকশনে গিয়ে একটি নতুন প্রফেশনাল রেজুমে তৈরি অথবা আপলোড করুন।' 
+                    : 'The live mock interview engine requires your CV analysis to generate dynamic, role-adaptive questions customized specifically to your target roles. Please create or upload a resume in the "AI Smart CV" module first.'}
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                  <Button 
+                    variant="primary" 
+                    onClick={onBack}
+                    className="w-full sm:w-auto font-bold px-6 py-2.5"
+                  >
+                    <LayoutDashboard className="w-4 h-4" />
+                    {isBn ? 'ড্যাশবোর্ড হোমে ফিরে যান' : 'Go to Dashboard Home'}
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                
+                {/* বাম কলাম: ক্যান্ডিডেট প্রোফাইল ও সিভি নির্বাচন */}
+                <div className="lg:col-span-5 flex flex-col gap-6">
+                  <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md">
+                    <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
+                      <User className="w-5 h-5 text-emerald-500" />
+                      {isBn ? 'প্রার্থীর তথ্য ও সিভি' : 'Candidate & CV Information'}
+                    </h3>
 
-                  {isCvsLoading ? (
-                    <div className="py-8 text-center flex flex-col items-center justify-center gap-3">
-                      <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
-                      <span className="text-xs text-slate-400 font-mono">Loading CV files...</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-5">
-                      {/* সিভি সিলেকশন ড্রপডাউন */}
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
-                          {isBn ? 'সক্রিয় জীবনবৃত্তান্ত (Resume) নির্বাচন' : 'Select Active Resume'}
-                        </label>
-                        <div className="relative">
-                          <select 
-                            value={selectedCv?.id || ''}
-                            onChange={(e) => handleCvChange(e.target.value)}
-                            className="w-full bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none pr-10 font-medium"
-                          >
-                            {resumes.map(cv => (
-                              <option key={cv.id} value={cv.id} className="dark:bg-slate-950 text-slate-900 dark:text-slate-100">
-                                {cv.personalInfo.name} - {cv.id === 'demo_software_cv' ? (isBn ? 'সিস্টেম ডেমো সিভি' : 'System Demo CV') : cv.personalInfo.email}
-                              </option>
-                            ))}
-                            {resumes.length === 0 && (
-                              <option value="demo_software_cv">{isBn ? 'ডেমো ডেভেলপার প্রোফাইল' : 'Demo Developer Profile'}</option>
-                            )}
-                          </select>
-                          <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                        </div>
+                    {isCvsLoading ? (
+                      <div className="py-8 text-center flex flex-col items-center justify-center gap-3">
+                        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
+                        <span className="text-xs text-slate-400 font-mono">Loading CV files...</span>
                       </div>
-
-                      {/* নির্বাচিত সিভির প্রার্থীর সংক্ষিপ্ত তথ্য */}
-                      {selectedCv && (
-                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 flex flex-col gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="h-11 w-11 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-sm border border-emerald-500/20">
-                              {getInitials(selectedCv.personalInfo.name)}
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-bold text-slate-900 dark:text-white">{selectedCv.personalInfo.name}</h4>
-                              <span className="text-[10px] text-slate-400 font-mono font-medium tracking-wide">ID: {selectedCv.id}</span>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-800/40 text-xs text-slate-500 dark:text-slate-400">
-                            <span className="flex items-center gap-1.5">
-                              <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{selectedCv.personalInfo.email}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{selectedCv.personalInfo.phone || 'N/A'}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5 sm:col-span-2">
-                              <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                              <span className="truncate">{selectedCv.personalInfo.address || 'Dhaka, Bangladesh'}</span>
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {resumes.length === 0 && (
-                        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex gap-2">
-                          <Info className="w-4 h-4 shrink-0 mt-0.5" />
-                          <div>
-                            {isBn 
-                              ? 'আপনার কোনো সিভি সংরক্ষিত নেই। আমরা পরীক্ষা করার সুবিধার্থে একটি ডেমো ডেভেলপার সিভি দিয়ে ইন্টারভিউ রেডি করেছি।' 
-                              : 'No uploaded resumes found. We loaded a high-quality system developer resume so you can try the live interview engine instantly!'}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Card>
-
-                {/* এআই অটো-ডিটেক্টেড ক্যারিয়ার পাথ কার্ড */}
-                <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md">
-                  <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
-                    <Brain className="w-5 h-5 text-emerald-500" />
-                    {isBn ? 'এআই ক্যারিয়ার ডিটেক্টর' : 'AI Career Path Detector'}
-                  </h3>
-
-                  {isAnalyzingCv ? (
-                    <div className="py-12 flex flex-col items-center gap-3">
-                      <div className="h-2 w-24 bg-emerald-500/20 rounded-full overflow-hidden">
-                        <div className="h-full bg-emerald-500 animate-pulse w-1/2 rounded-full" />
-                      </div>
-                      <span className="text-xs text-slate-400 animate-pulse">Analyzing CV keywords...</span>
-                    </div>
-                  ) : analysis ? (
-                    <div className="flex flex-col gap-4">
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                          {isBn ? 'স্বয়ংক্রিয়ভাবে সনাক্তকৃত ক্যারিয়ার পাথ' : 'Detected Career Path'}
-                        </span>
-                        <div className="px-4 py-2.5 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/5 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
-                          {analysis.careerPath}
-                        </div>
-                      </div>
-
-                      <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                          {isBn ? 'সিভি থেকে সংগৃহীত মূল স্কিলসমূহ' : 'Detected Keywords & Skills'}
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {analysis.skills.map((skill, i) => (
-                            <span 
-                              key={i} 
-                              className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+                    ) : (
+                      <div className="flex flex-col gap-5">
+                        {/* সিভি সিলেকশন ড্রপডাউন */}
+                        <div>
+                          <label className="block text-xs font-bold text-slate-400 dark:text-slate-400 mb-1.5 uppercase tracking-wider">
+                            {isBn ? 'সক্রিয় জীবনবৃত্তান্ত (Resume) নির্বাচন' : 'Select Active Resume'}
+                          </label>
+                          <div className="relative">
+                            <select 
+                              value={selectedCv?.id || ''}
+                              onChange={(e) => handleCvChange(e.target.value)}
+                              className="w-full bg-slate-50 dark:bg-slate-900/60 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none pr-10 font-medium"
                             >
-                              {skill}
-                            </span>
-                          ))}
+                              {resumes.map(cv => (
+                                <option key={cv.id} value={cv.id} className="dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+                                  {cv.personalInfo.name} - {cv.id === 'demo_software_cv' ? (isBn ? 'সিস্টেম ডেমো সিভি' : 'System Demo CV') : cv.personalInfo.email}
+                                </option>
+                              ))}
+                              {resumes.length === 0 && (
+                                <option value="demo_software_cv">{isBn ? 'ডেমো ডেভেলপার প্রোফাইল' : 'Demo Developer Profile'}</option>
+                              )}
+                            </select>
+                            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-xs text-slate-400">
-                      {isBn ? 'সিভি বিশ্লেষণ করা যায়নি।' : 'Unable to parse CV.'}
-                    </div>
-                  )}
-                </Card>
-              </div>
 
-              {/* ডান কলাম: রেডিটনেস মিটার ও স্টার্ট ইন্টারভিউ */}
-              <div className="lg:col-span-7 flex flex-col gap-6">
-                <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md flex-1 flex flex-col justify-between">
-                  <div>
-                    <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-6 flex items-center gap-2">
-                      <Award className="w-5 h-5 text-emerald-500" />
-                      {isBn ? 'ইন্টারভিউ প্রস্তুতি ও এনালাইসিস' : 'Interview Readiness Analysis'}
+                        {/* নির্বাচিত সিভির প্রার্থীর সংক্ষিপ্ত তথ্য */}
+                        {selectedCv && (
+                          <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/50 dark:border-slate-800/50 flex flex-col gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-11 w-11 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-sm border border-emerald-500/20">
+                                {getInitials(selectedCv.personalInfo.name)}
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">{selectedCv.personalInfo.name}</h4>
+                                <span className="text-[10px] text-slate-400 font-mono font-medium tracking-wide">ID: {selectedCv.id}</span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 pt-2 border-t border-slate-200/40 dark:border-slate-800/40 text-xs text-slate-500 dark:text-slate-400">
+                              <span className="flex items-center gap-1.5">
+                                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{selectedCv.personalInfo.email}</span>
+                              </span>
+                              <span className="flex items-center gap-1.5">
+                                <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{selectedCv.personalInfo.phone || 'N/A'}</span>
+                              </span>
+                              <span className="flex items-center gap-1.5 sm:col-span-2">
+                                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="truncate">{selectedCv.personalInfo.address || 'Dhaka, Bangladesh'}</span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {resumes.length === 0 && (
+                          <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 dark:text-amber-400 flex gap-2">
+                            <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                            <div>
+                              {isBn 
+                                ? 'আপনার কোনো সিভি সংরক্ষিত নেই। আমরা পরীক্ষা করার সুবিধার্থে একটি ডেমো ডেভেলপার সিভি দিয়ে ইন্টারভিউ রেডি করেছি।' 
+                                : 'No uploaded resumes found. We loaded a high-quality system developer resume so you can try the live interview engine instantly!'}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* এআই অটো-ডিটেক্টেড ক্যারিয়ার পাথ কার্ড */}
+                  <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md">
+                    <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-4 flex items-center gap-2">
+                      <Brain className="w-5 h-5 text-emerald-500" />
+                      {isBn ? 'এআই ক্যারিয়ার ডিটেক্টর' : 'AI Career Path Detector'}
                     </h3>
 
                     {isAnalyzingCv ? (
-                      <div className="py-24 flex items-center justify-center">
-                        <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
+                      <div className="py-12 flex flex-col items-center gap-3">
+                        <div className="h-2 w-24 bg-emerald-500/20 rounded-full overflow-hidden">
+                          <div className="h-full bg-emerald-500 animate-pulse w-1/2 rounded-full" />
+                        </div>
+                        <span className="text-xs text-slate-400 animate-pulse">Analyzing CV keywords...</span>
                       </div>
                     ) : analysis ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* এআই রেডিটনেস স্কোর */}
-                        <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800/60 flex flex-col items-center justify-center text-center">
-                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
-                            {isBn ? 'ইন্টারভিউ প্রস্তুতি স্কোর' : 'Interview Readiness Score'}
+                      <div className="flex flex-col gap-4">
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                            {isBn ? 'স্বয়ংক্রিয়ভাবে সনাক্তকৃত ক্যারিয়ার পাথ' : 'Detected Career Path'}
                           </span>
-                          <div className="relative flex items-center justify-center h-28 w-28">
-                            <svg className="w-full h-full transform -rotate-90">
-                              <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" className="text-slate-200 dark:text-slate-800" fill="transparent" />
-                              <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" className="text-emerald-500" fill="transparent"
-                                strokeDasharray={2 * Math.PI * 48}
-                                strokeDashoffset={2 * Math.PI * 48 * (1 - analysis.readinessScore / 100)} 
-                              />
-                            </svg>
-                            <span className="absolute text-2xl font-black font-mono text-slate-900 dark:text-white">
-                              {analysis.readinessScore}%
-                            </span>
+                          <div className="px-4 py-2.5 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/5 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold text-sm">
+                            {analysis.careerPath}
                           </div>
-                          <span className="text-xs text-slate-400 mt-3 font-semibold">
-                            {analysis.readinessScore > 80 
-                              ? (isBn ? 'চমৎকার প্রস্তুতি!' : 'Excellent Readiness!') 
-                              : (isBn ? 'মাঝারি প্রস্তুতি' : 'Moderate Readiness')}
-                          </span>
                         </div>
 
-                        {/* বিবরণী মেটাডাটা */}
-                        <div className="flex flex-col justify-center gap-4">
-                          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
-                            <Award className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'জীবনবৃত্তান্ত স্কোর' : 'Resume Score'}</p>
-                              <p className="text-sm font-black font-mono text-slate-800 dark:text-slate-200">{analysis.resumeScore}/100</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
-                            <Clock className="w-5 h-5 text-cyan-500 shrink-0" />
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'আনুমানিক সময়সীমা' : 'Estimated Duration'}</p>
-                              <p className="text-sm font-black text-slate-800 dark:text-slate-200">{analysis.duration}</p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
-                            <Sparkles className="w-5 h-5 text-purple-500 shrink-0" />
-                            <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'ভাইভা প্রশ্নের সংখ্যা' : 'Total Question'}</p>
-                              <p className="text-sm font-black text-slate-800 dark:text-slate-200">{isBn ? '৫টি এআই ফলো-আপ' : '5 Dynamic Q&As'}</p>
-                            </div>
+                        <div>
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
+                            {isBn ? 'সিভি থেকে সংগৃহীত মূল স্কিলসমূহ' : 'Detected Keywords & Skills'}
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {analysis.skills.map((skill, i) => (
+                              <span 
+                                key={i} 
+                                className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-slate-100 text-slate-700 dark:bg-slate-900/60 dark:text-slate-300 border border-slate-200 dark:border-slate-800"
+                              >
+                                {skill}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </div>
-                    ) : null}
-                  </div>
+                    ) : (
+                      <div className="text-center py-6 text-xs text-slate-400">
+                        {isBn ? 'সিভি বিশ্লেষণ করা যায়নি।' : 'Unable to parse CV.'}
+                      </div>
+                    )}
+                  </Card>
+                </div>
 
-                  {/* স্টার্ট ইন্টারভিউ অ্যাকশন বোতাম */}
-                  <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-col gap-3">
-                    <p className="text-xs text-slate-500 leading-relaxed text-center">
-                      {isBn 
-                        ? 'স্টার্ট বোতামে ক্লিক করলে এআই আপনার ক্যারিয়ার পাথ এবং প্রজেক্টের উপর ভিত্তি করে লাইভ প্রশ্ন করবে। আপনি আপনার মাইক্রোফোন ব্যবহার করে ইংরেজিতে উত্তর দিবেন।' 
-                        : 'Click start to launch the real-time interview. The AI will ask interactive, dynamic questions adapted from your CV profile, and you will respond using your microphone or keyboard.'}
-                    </p>
-                    <Button 
-                      variant="primary" 
-                      size="lg" 
-                      onClick={startInterview}
-                      disabled={isAnalyzingCv || !analysis}
-                      className="w-full text-base font-bold shadow-xl py-3.5 mt-2"
-                    >
-                      <Play className="w-5 h-5 fill-slate-950" />
-                      {isBn ? 'লাইভ এআই ইন্টারভিউ শুরু করুন' : 'Start Live AI Interview'}
-                    </Button>
-                  </div>
-                </Card>
+                {/* ডান কলাম: রেডিটনেস মিটার ও স্টার্ট ইন্টারভিউ */}
+                <div className="lg:col-span-7 flex flex-col gap-6">
+                  <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md flex-1 flex flex-col justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold font-display text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-800 pb-3 mb-6 flex items-center gap-2">
+                        <Award className="w-5 h-5 text-emerald-500" />
+                        {isBn ? 'ইন্টারভিউ প্রস্তুতি ও এনালাইসিস' : 'Interview Readiness Analysis'}
+                      </h3>
+
+                      {isAnalyzingCv ? (
+                        <div className="py-24 flex items-center justify-center">
+                          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
+                        </div>
+                      ) : analysis ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* এআই রেডিটনেস স্কোর */}
+                          <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800/60 flex flex-col items-center justify-center text-center">
+                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                              {isBn ? 'ইন্টারভিউ প্রস্তুতি স্কোর' : 'Interview Readiness Score'}
+                            </span>
+                            <div className="relative flex items-center justify-center h-28 w-28">
+                              <svg className="w-full h-full transform -rotate-90">
+                                <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" className="text-slate-200 dark:text-slate-800" fill="transparent" />
+                                <circle cx="56" cy="56" r="48" stroke="currentColor" strokeWidth="8" className="text-emerald-500" fill="transparent"
+                                  strokeDasharray={2 * Math.PI * 48}
+                                  strokeDashoffset={2 * Math.PI * 48 * (1 - analysis.readinessScore / 100)} 
+                                />
+                              </svg>
+                              <span className="absolute text-2xl font-black font-mono text-slate-900 dark:text-white">
+                                {analysis.readinessScore}%
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-400 mt-3 font-semibold">
+                              {analysis.readinessScore > 80 
+                                ? (isBn ? 'চমৎকার প্রস্তুতি!' : 'Excellent Readiness!') 
+                                : (isBn ? 'মাঝারি প্রস্তুতি' : 'Moderate Readiness')}
+                            </span>
+                          </div>
+
+                          {/* বিবরণী মেটাডাটা */}
+                          <div className="flex flex-col justify-center gap-4">
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
+                              <Award className="w-5 h-5 text-emerald-500 shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'জীবনবৃত্তান্ত স্কোর' : 'Resume Score'}</p>
+                                <p className="text-sm font-black font-mono text-slate-800 dark:text-slate-200">{analysis.resumeScore}/100</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
+                              <Clock className="w-5 h-5 text-cyan-500 shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'আনুমানিক সময়সীমা' : 'Estimated Duration'}</p>
+                                <p className="text-sm font-black text-slate-800 dark:text-slate-200">{analysis.duration}</p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-slate-100 dark:border-slate-800">
+                              <Sparkles className="w-5 h-5 text-purple-500 shrink-0" />
+                              <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase">{isBn ? 'ভাইভা প্রশ্নের সংখ্যা' : 'Total Question'}</p>
+                                <p className="text-sm font-black text-slate-800 dark:text-slate-200">{isBn ? '৫টি এআই ফলো-আপ' : '5 Dynamic Q&As'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* স্টার্ট ইন্টারভিউ অ্যাকশন বোতাম */}
+                    <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 flex flex-col gap-3">
+                      <p className="text-xs text-slate-500 leading-relaxed text-center">
+                        {isBn 
+                          ? 'স্টার্ট বোতামে ক্লিক করলে এআই আপনার ক্যারিয়ার পাথ এবং প্রজেক্টের উপর ভিত্তি করে লাইভ প্রশ্ন করবে। আপনি আপনার মাইক্রোফোন ব্যবহার করে ইংরেজিতে উত্তর দিবেন।' 
+                          : 'Click start to launch the real-time interview. The AI will ask interactive, dynamic questions adapted from your CV profile, and you will respond using your microphone or keyboard.'}
+                      </p>
+                      <Button 
+                        variant="primary" 
+                        size="lg" 
+                        onClick={startInterview}
+                        disabled={isAnalyzingCv || !analysis}
+                        className="w-full text-base font-bold shadow-xl py-3.5 mt-2"
+                      >
+                        <Play className="w-5 h-5 fill-slate-950" />
+                        {isBn ? 'লাইভ এআই ইন্টারভিউ শুরু করুন' : 'Start Live AI Interview'}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       )}

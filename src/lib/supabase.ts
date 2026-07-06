@@ -51,7 +51,7 @@ class SupabaseAuthSimulator {
       id: newId,
       fullName,
       email,
-      skills: ['React', 'JavaScript', 'Tailwind CSS'],
+      skills: [],
       createdAt: new Date().toISOString()
     };
 
@@ -224,36 +224,13 @@ class SupabaseDatabaseSimulator {
 export const mockAuth = new SupabaseAuthSimulator();
 export const mockDb = new SupabaseDatabaseSimulator();
 
-// মক ডাটা সিড করা (Seed Mock Data if empty)
+// লোকাল স্টোরেজ ডাটাবেজ ইনিশিয়ালাইজেশন (Initialize storage lists with empty arrays if not present)
 const initializeMockData = () => {
   if (!localStorage.getItem('skillproof_profiles')) {
-    const defaultProfile: UserProfile = {
-      id: 'demo_user_id',
-      fullName: 'আরিফুল ইসলাম (Ariful Islam)',
-      email: 'nishat.af27@gmail.com',
-      phone: '+8801712345678',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
-      education: 'B.Sc. in Computer Science & Engineering (DU)',
-      experience: '২ বছরের ফুলস্ট্যাক ডেভেলপমেন্ট অভিজ্ঞতা (MERN Stack)',
-      skills: ['React', 'Node.js', 'PostgreSQL', 'Tailwind CSS', 'TypeScript', 'Git'],
-      socialLinks: {
-        github: 'https://github.com',
-        linkedin: 'https://linkedin.com',
-        portfolio: 'https://portfolio.me'
-      },
-      createdAt: new Date().toISOString()
-    };
-
-    const defaultSettings: UserSettings = {
-      userId: 'demo_user_id',
-      language: 'bn',
-      theme: 'dark',
-      notificationsEnabled: true,
-      marketingEmails: false
-    };
-
-    localStorage.setItem('skillproof_profiles', JSON.stringify([defaultProfile]));
-    localStorage.setItem('skillproof_settings', JSON.stringify([defaultSettings]));
+    localStorage.setItem('skillproof_profiles', JSON.stringify([]));
+  }
+  if (!localStorage.getItem('skillproof_settings')) {
+    localStorage.setItem('skillproof_settings', JSON.stringify([]));
   }
 };
 
