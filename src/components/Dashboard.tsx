@@ -33,7 +33,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'dashboard' }) => {
   const { t, isBn, language } = useLanguage();
-  const { user, settings, updateProfile, updateSettings, deleteAccount } = useAuth();
+  const { user, settings, updateProfile, updateSettings, deleteAccount, uploadProfilePicture, deleteProfilePicture } = useAuth();
 
   // রুট ট্র্যাকিং স্টেট (Current active tab routing state)
   const [activeTab, setActiveTab] = useState<string>(initialTab);
@@ -44,6 +44,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
 
   // প্রোফাইল এডিট স্টেট (Profile editing states)
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [fullNameInput, setFullNameInput] = useState(user?.fullName || '');
   const [phoneInput, setPhoneInput] = useState(user?.phone || '');
   const [educationInput, setEducationInput] = useState(user?.education || '');

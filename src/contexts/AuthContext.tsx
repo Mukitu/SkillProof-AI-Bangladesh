@@ -19,6 +19,8 @@ interface AuthContextType {
   updateProfile: (updates: Partial<UserProfile>) => Promise<{ success: boolean; error: string | null }>;
   updateSettings: (updates: Partial<UserSettings>) => Promise<{ success: boolean; error: string | null }>;
   deleteAccount: () => Promise<{ success: boolean; error: string | null }>;
+  uploadProfilePicture: (file: File) => Promise<{ success: boolean; url: string | null; error: string | null }>;
+  deleteProfilePicture: () => Promise<{ success: boolean; error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -155,6 +157,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: true, error: null };
   };
 
+  // প্রোফাইল ছবি আপলোড (Upload Profile Picture)
+  const uploadProfilePicture = async (file: File) => {
+    if (!user) return { success: false, url: null, error: 'ইউজার লগইন করা নেই' };
+
+    const { success, url, error } = await mockDb.uploadProfilePicture(user.id, file);
+    if (success && url) {
+      setUser({ ...user, avatarUrl: url });
+      return { success: true, url, error: null };
+    }
+    return { success: false, url: null, error };
+  };
+
+  // প্রোফাইল ছবি ডিলিট (Delete Profile Picture)
+  const deleteProfilePicture = async () => {
+    if (!user) return { success: false, error: 'ইউজার লগইন করা নেই' };
+
+    const { success, error } = await mockDb.deleteProfilePicture(user.id);
+    if (success) {
+      setUser({ ...user, avatarUrl: '' });
+      return { success: true, error: null };
+    }
+    return { success: false, error };
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -168,7 +194,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sendResetEmail,
         updateProfile,
         updateSettings,
-        deleteAccount
+        deleteAccount,
+        uploadProfilePicture,
+        deleteProfilePicture
       }}
     >
       {children}
