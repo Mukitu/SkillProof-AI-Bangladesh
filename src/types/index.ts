@@ -21,7 +21,20 @@ export interface UserProfile {
     github?: string;
     linkedin?: string;
     portfolio?: string;
+    address?: string;
+    university?: string;
+    department?: string;
+    semester?: string;
+    bio?: string;
   };
+  address?: string;
+  university?: string;
+  department?: string;
+  semester?: string;
+  linkedin?: string;
+  github?: string;
+  portfolio?: string;
+  bio?: string;
   createdAt: string;
 }
 

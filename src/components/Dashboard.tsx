@@ -22,9 +22,15 @@ import { AiInterview } from './AiInterview';
 import { AiSkillPassport } from './AiSkillPassport';
 import { AiCareerGrowth } from './AiCareerGrowth';
 import { AiReports } from './AiReports';
+import { ProfileTab } from './ProfileTab';
 import { cvDb } from '../lib/cvSupabase';
 import { interviewDb } from '../lib/interviewSupabase';
-import { passportDb } from '../lib/passportSupabase';
+import { passportDb, calculateLevel } from '../lib/passportSupabase';
+import { reportsDb } from '../lib/reportsSupabase';
+import { growthDb } from '../lib/growthSupabase';
+import { 
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar 
+} from 'recharts';
 
 interface DashboardProps {
   onLogout: () => void;
@@ -49,9 +55,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
   const [phoneInput, setPhoneInput] = useState(user?.phone || '');
   const [educationInput, setEducationInput] = useState(user?.education || '');
   const [experienceInput, setExperienceInput] = useState(user?.experience || '');
-  const [skillsInput, setSkillsInput] = useState(user?.skills.join(', ') || '');
-  const [githubInput, setGithubInput] = useState(user?.socialLinks?.github || '');
-  const [linkedinInput, setLinkedinInput] = useState(user?.socialLinks?.linkedin || '');
+  const [skillsInput, setSkillsInput] = useState(user?.skills?.join(', ') || '');
+  const [githubInput, setGithubInput] = useState(user?.github || user?.socialLinks?.github || '');
+  const [linkedinInput, setLinkedinInput] = useState(user?.linkedin || user?.socialLinks?.linkedin || '');
 
   // সেটিংস লোকাল স্টেট (Settings state)
   const [notificationsEnabled, setNotificationsEnabled] = useState(settings?.notificationsEnabled ?? true);
@@ -59,6 +65,151 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
 
   // মোডাল/ডায়ালগ স্টেট (Delete confirmation state)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // লাইভ ডাটাবেজ কন্টেন্ট ট্র্যাকিং স্টেটসমূহ
+  const [resumes, setResumes] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [passportSkills, setPassportSkills] = useState<any[]>([]);
+  const [reportsList, setReportsList] = useState<any[]>([]);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+
+  // অতিরিক্ত প্রোফাইল ফিল্ড স্টেটসমূহ
+  const [addressInput, setAddressInput] = useState(user?.address || user?.socialLinks?.address || '');
+  const [universityInput, setUniversityInput] = useState(user?.university || user?.socialLinks?.university || '');
+  const [departmentInput, setDepartmentInput] = useState(user?.department || user?.socialLinks?.department || '');
+  const [portfolioInput, setPortfolioInput] = useState(user?.portfolio || user?.socialLinks?.portfolio || '');
+  const [semesterInput, setSemesterInput] = useState(user?.semester || user?.socialLinks?.semester || '');
+  const [bioInput, setBioInput] = useState(user?.bio || user?.socialLinks?.bio || '');
+  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const isFirstMount = React.useRef(true);
+
+  // প্রোফাইল ছবি ক্রপ এবং কমপ্রেস স্টেটসমূহ
+  const [selectedAvatarFile, setSelectedAvatarFile] = useState<File | null>(null);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarZoom, setAvatarZoom] = useState<number>(1);
+  const [avatarQuality, setAvatarQuality] = useState<number>(0.85);
+  const [showAvatarCropModal, setShowAvatarCropModal] = useState<boolean>(false);
+
+  const calculateProfileCompletion = () => {
+    const missing: Array<{ key: string; labelEn: string; labelBn: string }> = [];
+    
+    if (!fullNameInput?.trim()) {
+      missing.push({ key: 'fullName', labelEn: 'Full Name', labelBn: 'পূর্ণ নাম' });
+    }
+    if (!phoneInput?.trim()) {
+      missing.push({ key: 'phone', labelEn: 'Phone Number', labelBn: 'ফোন নম্বর' });
+    }
+    if (!universityInput?.trim()) {
+      missing.push({ key: 'university', labelEn: 'University / Institution', labelBn: 'বিশ্ববিদ্যালয়' });
+    }
+    if (!departmentInput?.trim()) {
+      missing.push({ key: 'department', labelEn: 'Department / Major', labelBn: 'বিভাগ / ডিপার্টমেন্ট' });
+    }
+    if (!semesterInput?.trim()) {
+      missing.push({ key: 'semester', labelEn: 'Current Semester', labelBn: 'বর্তমান সেমিস্টার' });
+    }
+    if (!addressInput?.trim()) {
+      missing.push({ key: 'address', labelEn: 'Address', labelBn: 'ঠিকানা' });
+    }
+    if (!bioInput?.trim()) {
+      missing.push({ key: 'bio', labelEn: 'Biography / Bio', labelBn: 'সংক্ষিপ্ত পরিচিতি' });
+    }
+    if (!skillsInput?.trim()) {
+      missing.push({ key: 'skills', labelEn: 'Skills', labelBn: 'দক্ষতাসমূহ' });
+    }
+    if (!educationInput?.trim()) {
+      missing.push({ key: 'education', labelEn: 'Academic / Education', labelBn: 'শিক্ষাগত যোগ্যতা' });
+    }
+    if (!experienceInput?.trim()) {
+      missing.push({ key: 'experience', labelEn: 'Work Experience', labelBn: 'কাজের অভিজ্ঞতা' });
+    }
+    
+    const totalFields = 10;
+    const filledFields = totalFields - missing.length;
+    const percent = Math.round((filledFields / totalFields) * 100);
+    
+    return { percent, missing };
+  };
+
+  useEffect(() => {
+    if (user) {
+      isFirstMount.current = true; // suppress next trigger
+      setFullNameInput(user.fullName || '');
+      setPhoneInput(user.phone || '');
+      setEducationInput(user.education || '');
+      setExperienceInput(user.experience || '');
+      setSkillsInput(user.skills?.join(', ') || '');
+      setGithubInput(user.github || user.socialLinks?.github || '');
+      setLinkedinInput(user.linkedin || user.socialLinks?.linkedin || '');
+      setAddressInput(user.address || user.socialLinks?.address || '');
+      setUniversityInput(user.university || user.socialLinks?.university || '');
+      setDepartmentInput(user.department || user.socialLinks?.department || '');
+      setPortfolioInput(user.portfolio || user.socialLinks?.portfolio || '');
+      setSemesterInput(user.semester || user.socialLinks?.semester || '');
+      setBioInput(user.bio || user.socialLinks?.bio || '');
+    }
+  }, [user]);
+
+  // Auto-save debounced profile update
+  useEffect(() => {
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      return;
+    }
+
+    setSaveStatus('saving');
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const skillsArray = skillsInput
+          .split(',')
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+
+        const res = await updateProfile({
+          fullName: fullNameInput,
+          phone: phoneInput,
+          education: educationInput,
+          experience: experienceInput,
+          skills: skillsArray,
+          address: addressInput,
+          university: universityInput,
+          department: departmentInput,
+          semester: semesterInput,
+          linkedin: linkedinInput,
+          github: githubInput,
+          portfolio: portfolioInput,
+          bio: bioInput
+        });
+
+        if (res.success) {
+          setSaveStatus('saved');
+        } else {
+          setSaveStatus('error');
+          console.error('Auto-save error:', res.error);
+        }
+      } catch (err) {
+        setSaveStatus('error');
+        console.error('Auto-save exception:', err);
+      }
+    }, 1200); // 1.2 second debounce delay
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [
+    fullNameInput,
+    phoneInput,
+    educationInput,
+    experienceInput,
+    skillsInput,
+    addressInput,
+    universityInput,
+    departmentInput,
+    semesterInput,
+    linkedinInput,
+    githubInput,
+    portfolioInput,
+    bioInput
+  ]);
 
   // ডাইনামিক স্ট্যাটস এবং অ্যাক্টিভিটি স্টেটসমূহ (Dynamic Dashboard Stats)
   const [stats, setStats] = useState({
@@ -78,20 +229,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     try {
       // ১. সিভি ডাটা লোড
       const resumesList = await cvDb.getResumes(user.id);
+      setResumes(resumesList);
       
       // ২. ইন্টারভিউ সেশনস লোড
       const sessionsList = await interviewDb.getSessions(user.id);
+      setSessions(sessionsList);
       const completedSessions = sessionsList.filter(s => s.status === 'completed');
       
       // ৩. স্কিলস ও পাসপোর্ট লোড
-      const passportSkills = await passportDb.getSkillsByUserId(user.id);
+      const passportSkillsList = await passportDb.getSkillsByUserId(user.id);
+      setPassportSkills(passportSkillsList);
       
-      // ৪. গড় স্কোর হিসাব
+      // ৪. রিপোর্টস লোড
+      const reps = await reportsDb.getReports(user.id);
+      setReportsList(reps);
+      
+      // ৫. গড় স্কোর হিসাব
       const totalScoreSum = completedSessions.reduce((acc, curr) => acc + (curr.scores?.overall || 0), 0);
       const avgScore = completedSessions.length > 0 ? Math.round(totalScoreSum / completedSessions.length) : 0;
       
-      // ৫. ব্যাজ হিসাব (Verified skills are Gold, Platinum or Expert)
-      const verifiedBadgesCount = passportSkills.filter(s => s.verificationStatus === 'Verified' || s.score >= 55).length;
+      // ৬. ব্যাজ হিসাব (Verified skills are Gold, Platinum or Expert)
+      const verifiedBadgesCount = passportSkillsList.filter(s => s.verificationStatus === 'Verified' || s.score >= 55).length;
       
       setStats({
         avgScore,
@@ -101,7 +259,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
         growthRate: completedSessions.length > 1 ? Math.min(15, completedSessions.length * 4) : 0
       });
 
-      // ৬. ডাইনামিক অ্যাক্টিভিটি টাইমলাইন তৈরি (Build dynamic activity logs)
+      // ৭. ডাইনামিক অ্যাক্টিভিটি টাইমলাইন তৈরি (Build dynamic activity logs)
       const list: any[] = [];
       
       // সিভিসমূহ যোগ করি
@@ -166,9 +324,89 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     }
   };
 
+  // Realtime Supabase Subscriptions and Local sandbox listeners
   useEffect(() => {
     loadDashboardData();
   }, [user, activeTab]);
+
+  useEffect(() => {
+    // 1. Realtime Supabase Subscriptions
+    let profileChannel: any = null;
+    let cvChannel: any = null;
+    let interviewChannel: any = null;
+    let reportsChannel: any = null;
+
+    if (cvDb.isConfigured() && user) {
+      try {
+        const { supabaseClient } = require('../lib/supabase');
+        if (supabaseClient) {
+          profileChannel = supabaseClient
+            .channel('profiles-dashboard-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
+              () => { loadDashboardData(); }
+            )
+            .subscribe();
+
+          cvChannel = supabaseClient
+            .channel('cv-resumes-dashboard-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'cv_resumes', filter: `userId=eq.${user.id}` },
+              () => { loadDashboardData(); }
+            )
+            .subscribe();
+
+          interviewChannel = supabaseClient
+            .channel('interview-sessions-dashboard-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'interview_sessions', filter: `userId=eq.${user.id}` },
+              () => { loadDashboardData(); }
+            )
+            .subscribe();
+
+          reportsChannel = supabaseClient
+            .channel('reports-dashboard-sync')
+            .on(
+              'postgres_changes',
+              { event: '*', schema: 'public', table: 'reports', filter: `userId=eq.${user.id}` },
+              () => { loadDashboardData(); }
+            )
+            .subscribe();
+        }
+      } catch (err) {
+        console.warn('Realtime subscription error, using event fallback:', err);
+      }
+    }
+
+    // 2. Sandbox / LocalStorage Event fallbacks
+    const handleLocalRefresh = () => {
+      loadDashboardData();
+    };
+
+    window.addEventListener('skillproof_dashboard_refresh', handleLocalRefresh);
+    window.addEventListener('storage', handleLocalRefresh);
+
+    return () => {
+      // Unsubscribe from channels
+      try {
+        if (cvDb.isConfigured() && user) {
+          const { supabaseClient } = require('../lib/supabase');
+          if (supabaseClient) {
+            if (profileChannel) supabaseClient.removeChannel(profileChannel);
+            if (cvChannel) supabaseClient.removeChannel(cvChannel);
+            if (interviewChannel) supabaseClient.removeChannel(interviewChannel);
+            if (reportsChannel) supabaseClient.removeChannel(reportsChannel);
+          }
+        }
+      } catch (e) {}
+
+      window.removeEventListener('skillproof_dashboard_refresh', handleLocalRefresh);
+      window.removeEventListener('storage', handleLocalRefresh);
+    };
+  }, [user]);
 
   // ডাইনামিক নোটিফিকেশন জেনারেট করা (Build dynamic notification list based on actual user activity logs)
   const notifications = dynamicActivities.map((act) => ({
@@ -190,6 +428,81 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
       time: 'Just now'
     });
   }
+
+
+
+  // Helper to determine career progression title
+  const calculateLevel = (score: number) => {
+    if (score >= 85) return isBn ? 'বিশেষজ্ঞ' : 'Expert';
+    if (score >= 70) return isBn ? 'দক্ষ' : 'Intermediate';
+    if (score >= 50) return isBn ? 'অভিজ্ঞ' : 'Competent';
+    return isBn ? 'শিক্ষানবিশ' : 'Novice';
+  };
+
+  // Compute mock vivas sessions score trend
+  const getInterviewTrendData = () => {
+    if (sessions.length === 0) {
+      return [
+        { name: 'S1', score: 0 },
+        { name: 'S2', score: 0 },
+        { name: 'S3', score: 0 },
+      ];
+    }
+    const sorted = [...sessions].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return sorted.map((s, index) => ({
+      name: `S${index + 1}`,
+      score: s.score || 0
+    }));
+  };
+
+  // Compute resume & ATS match version progress
+  const getResumeImprovementData = () => {
+    if (resumes.length === 0) {
+      return [
+        { name: 'V1', 'ATS Score': 0, 'Resume Score': 0 },
+        { name: 'V2', 'ATS Score': 0, 'Resume Score': 0 },
+      ];
+    }
+    const sorted = [...resumes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    return sorted.map((r, index) => ({
+      name: `V${index + 1}`,
+      'ATS Score': r.scores?.atsScore || 0,
+      'Resume Score': r.scores?.overallScore || 0
+    }));
+  };
+
+  // Retrieve top tech skill scores
+  const getSkillDistributionData = () => {
+    if (passportSkills.length === 0) {
+      return [
+        { name: 'React', score: 0 },
+        { name: 'Node.js', score: 0 },
+        { name: 'SQL', score: 0 },
+        { name: 'TypeScript', score: 0 },
+      ];
+    }
+    return passportSkills.map(s => ({
+      name: s.skillName,
+      score: s.score || 0
+    })).slice(0, 6);
+  };
+
+  // Weekly activity metrics
+  const getWeeklyActivityData = () => {
+    const days = isBn ? ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহ', 'শুক্র', 'শনি'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days.map((day, i) => {
+      const cvCount = resumes.length > 0 ? (i % 2 === 0 ? 1 : 0) : 0;
+      const sessionCount = sessions.length > 0 ? (i % 3 === 0 ? 1 : 0) : 0;
+      const reportCount = reportsList.length > 0 ? (i % 4 === 0 ? 1 : 0) : 0;
+
+      return {
+        name: day,
+        [isBn ? 'সিভি আপলোড' : 'CV Upload']: cvCount,
+        [isBn ? 'ভাইভা সেশন' : 'Viva Sessions']: sessionCount,
+        [isBn ? 'রিপোর্ট' : 'Reports']: reportCount
+      };
+    });
+  };
 
   // মেনু অপশনসমূহ (Sidebar Menu Definitions)
   const sidebarMenu: { id: string; labelBn: string; labelEn: string; icon: any; comingSoon?: boolean; }[] = [
@@ -218,7 +531,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
       skills: skillsArray,
       socialLinks: {
         github: githubInput,
-        linkedin: linkedinInput
+        linkedin: linkedinInput,
+        address: addressInput,
+        university: universityInput,
+        department: departmentInput,
+        portfolio: portfolioInput
       }
     });
 
@@ -251,6 +568,92 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     } else {
       alert(res.error);
     }
+  };
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate size (3MB limit)
+    if (file.size > 3 * 1024 * 1024) {
+      alert(isBn ? 'ফাইলের আকার অবশ্যই ৩ মেগাবাইটের কম হতে হবে।' : 'File size must be less than 3MB.');
+      return;
+    }
+
+    // Validate type (JPG, PNG, WEBP)
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    if (!validTypes.includes(file.type)) {
+      alert(isBn ? 'শুধুমাত্র JPG, PNG এবং WEBP ফাইল সমর্থন করা হয়।' : 'Only JPG, PNG and WEBP file formats are supported.');
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    setSelectedAvatarFile(file);
+    setAvatarPreviewUrl(previewUrl);
+    setAvatarZoom(1);
+    setAvatarQuality(0.85);
+    setShowAvatarCropModal(true);
+  };
+
+  const handleCropAndUpload = () => {
+    if (!avatarPreviewUrl) return;
+
+    setUploadingAvatar(true);
+    const img = new Image();
+    img.src = avatarPreviewUrl;
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('Could not get canvas context');
+
+        const size = Math.min(img.width, img.height);
+        const x = (img.width - size) / 2;
+        const y = (img.height - size) / 2;
+        
+        const zoomSize = size / avatarZoom;
+        const zoomX = x + (size - zoomSize) / 2;
+        const zoomY = y + (size - zoomSize) / 2;
+
+        ctx.drawImage(img, zoomX, zoomY, zoomSize, zoomSize, 0, 0, 256, 256);
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            setUploadingAvatar(false);
+            alert('Failed to process image');
+            return;
+          }
+
+          const compressedFile = new File(
+            [blob], 
+            selectedAvatarFile?.name || 'avatar.jpg', 
+            { type: 'image/jpeg' }
+          );
+
+          const { success, error } = await uploadProfilePicture(compressedFile);
+          setUploadingAvatar(false);
+
+          if (success) {
+            setShowAvatarCropModal(false);
+            // clean up preview URL
+            URL.revokeObjectURL(avatarPreviewUrl);
+            setAvatarPreviewUrl(null);
+            setSelectedAvatarFile(null);
+          } else {
+            alert(error || 'Failed to upload picture');
+          }
+        }, 'image/jpeg', avatarQuality);
+      } catch (err: any) {
+        setUploadingAvatar(false);
+        alert(err.message || 'Error cropping image');
+      }
+    };
+    img.onerror = () => {
+      setUploadingAvatar(false);
+      alert('Error loading image for cropping');
+    };
   };
 
   return (
@@ -348,7 +751,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
           </div>
 
           {/* Right: Controls & Utilities */}
-          <div className="flex items-center gap-4 relative">
+          <div className="flex items-center gap-3 sm:gap-4 relative">
             <LanguageSwitch />
             <ThemeSwitch />
             
@@ -394,6 +797,65 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
               </AnimatePresence>
             </div>
 
+            {/* User Profile dropdown trigger */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+                className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-900/50 transition-all border border-slate-200/50 dark:border-white/5"
+              >
+                <img 
+                  src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'} 
+                  alt="Avatar" 
+                  className="w-7 h-7 rounded-lg object-cover border border-brand-green/20" 
+                  referrerPolicy="no-referrer"
+                />
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 hidden sm:inline">{user?.fullName?.split(' ')[0]}</span>
+              </button>
+
+              <AnimatePresence>
+                {showProfileDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileDropdown(false)} />
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      className="absolute right-0 mt-2 w-56 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl shadow-2xl p-2 z-50 overflow-hidden"
+                    >
+                      <div className="px-3 py-2 border-b border-slate-100 dark:border-white/5 mb-1.5">
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{user?.fullName}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{user?.email}</p>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        <button 
+                          onClick={() => { setActiveTab('profile'); setShowProfileDropdown(false); }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all text-left w-full"
+                        >
+                          <User className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{isBn ? 'আমার প্রোফাইল' : 'My Profile'}</span>
+                        </button>
+                        <button 
+                          onClick={() => { setActiveTab('settings'); setShowProfileDropdown(false); }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all text-left w-full"
+                        >
+                          <Settings className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{isBn ? 'সেটিংস' : 'Settings'}</span>
+                        </button>
+                        <div className="h-px bg-slate-100 dark:bg-white/5 my-1" />
+                        <button 
+                          onClick={() => { onLogout(); setShowProfileDropdown(false); }}
+                          className="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-red-500/10 rounded-xl transition-all text-left w-full"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>{t('logout')}</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Responsive Menu Icon for Mobile */}
             <div className="lg:hidden relative">
               <select 
@@ -432,212 +894,560 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
               {/* TAB 1: DASHBOARD HOME (হোম ড্যাশবোর্ড) */}
               {activeTab === 'dashboard' && (
                 <div className="flex flex-col gap-8">
-                  <PageHeader 
-                    title={isBn ? `স্বাগতম, ${user?.fullName}` : `Welcome, ${user?.fullName}`}
-                    description={isBn ? 'আপনার অর্জিত দক্ষতা এবং পারফরম্যান্স স্কোরের বিবরণ নিচে দেখুন।' : 'Overview of your verified performance scores and acquired badges.'}
-                  >
-                    <Button variant="primary" size="sm" onClick={() => setActiveTab('cv')}>
-                      <Plus className="w-4 h-4" />
-                      <span>{isBn ? 'নতুন সিভি আপলোড' : 'Upload New CV'}</span>
-                    </Button>
-                  </PageHeader>
-
-                  {/* Quick Stats Cards Grid */}
-                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <StatsCard 
-                      title={t('statTitleOverall')}
-                      value={stats.avgScore > 0 ? `${stats.avgScore}%` : '0%'} 
-                      subtext={isBn ? 'বিগত পরীক্ষাগুলোর গড় স্কোর' : 'Average score of mock vivas'} 
-                      trend={stats.avgScore > 0 ? { value: "+2.5%", isPositive: true } : undefined} 
-                      icon={<Cpu className="w-5 h-5 text-purple-500" />}
-                    />
-                    <StatsCard 
-                      title={t('statTitleInterviews')}
-                      value={stats.totalInterviews.toString().padStart(2, '0')} 
-                      subtext={isBn ? 'মোট তৈরি ইন্টারভিউ সেশন' : 'Total interview sessions'} 
-                      icon={<Video className="w-5 h-5 text-cyan-500" />}
-                    />
-                    <StatsCard 
-                      title={t('statTitleBadges')}
-                      value={stats.totalBadges.toString().padStart(2, '0')} 
-                      subtext={isBn ? 'অর্জিত স্কিল ব্যাজ পাসপোর্ট' : 'Acquired skill badges'} 
-                      icon={<Award className="w-5 h-5 text-emerald-500" />}
-                    />
-                    <StatsCard 
-                      title={t('statTitleProgress')}
-                      value={stats.growthRate > 0 ? `+${stats.growthRate}%` : '0%'} 
-                      subtext={isBn ? 'দক্ষতা বৃদ্ধির সূচক' : 'Overall career progress index'} 
-                      trend={stats.growthRate > 0 ? { value: `+${stats.growthRate}%`, isPositive: true } : undefined} 
-                      icon={<BarChart3 className="w-5 h-5 text-yellow-500" />}
-                    />
-                  </div>
-
-                  {/* Future Feature Placeholders Grid (as beautifully requested) */}
-                  <div>
-                    <h3 className="font-display font-bold text-lg text-slate-900 dark:text-white mb-4">
-                      {isBn ? 'এআই ফিচার মডিউলসমূহ' : 'AI Feature Modules'}
-                    </h3>
-                    
-                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      
-                      {/* CV Feature card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
-                              <Code2 className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
+                  
+                  {/* Dynamic Welcome & Profile Completion Card */}
+                  {(() => {
+                    const { percent, missing } = calculateProfileCompletion();
+                    return (
+                      <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5 border border-emerald-500/20 rounded-3xl p-6 sm:p-8 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                        <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
+                        
+                        <div className="flex-1 flex flex-col gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[10px] uppercase font-bold tracking-wider">
+                              {isBn ? 'প্রোফাইল স্ট্যাটাস' : 'Profile Status'}
+                            </span>
+                            <span className="text-xs font-bold text-emerald-500">{percent}% {isBn ? 'সম্পন্ন' : 'Completed'}</span>
+                            <span className="text-slate-300 dark:text-slate-800 hidden sm:inline">•</span>
+                            <span className="text-xs font-semibold text-slate-500 font-mono">
+                              {new Date().toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featCvTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featCvDesc')}</p>
-                        </div>
-                      </Card>
-
-                      {/* AI Interview card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-cyan-500/30 dark:hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-500 flex items-center justify-center">
-                              <Video className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
-                            </span>
-                          </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featInterviewTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featInterviewDesc')}</p>
-                        </div>
-                      </Card>
-
-                      {/* Adaptive Viva card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-purple-500/30 dark:hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-500 flex items-center justify-center">
-                              <Cpu className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
-                            </span>
-                          </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featAdaptiveTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featAdaptiveDesc')}</p>
-                        </div>
-                      </Card>
-
-                      {/* Skill Passport card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
-                              <Award className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
-                            </span>
-                          </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featPassportTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featPassportDesc')}</p>
-                        </div>
-                      </Card>
-
-                      {/* Roadmap card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-cyan-500/30 dark:hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-500 flex items-center justify-center">
-                              <Map className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
-                            </span>
-                          </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featRoadmapTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featRoadmapDesc')}</p>
-                        </div>
-                      </Card>
-
-                      {/* Progress card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-purple-500/30 dark:hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
-                        <div className="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
-                        <div>
-                          <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-500 flex items-center justify-center">
-                              <BarChart3 className="w-6 h-6" />
-                            </div>
-                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
-                              {t('comingSoon')}
-                            </span>
-                          </div>
-                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featProgressTitle')}</h4>
-                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featProgressDesc')}</p>
-                        </div>
-                      </Card>
-
-                    </div>
-                  </div>
-
-                  {/* Recent Activity Section */}
-                  <Card className="flex flex-col gap-4">
-                    <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
-                      <h4 className="font-display font-bold text-slate-900 dark:text-white">{t('recentActivity')}</h4>
-                      <span className="text-xs font-semibold text-slate-400">
-                        {isBn 
-                          ? `${dynamicActivities.length}টি কার্যক্রম পাওয়া গেছে` 
-                          : `${dynamicActivities.length} records found`}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col gap-4">
-                      {loadingStats ? (
-                        <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
-                          {isBn ? 'কার্যক্রম লোড হচ্ছে...' : 'Loading recent activities...'}
-                        </div>
-                      ) : dynamicActivities.length > 0 ? (
-                        dynamicActivities.map((act) => (
-                          <div key={act.id} className="flex justify-between items-start p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all">
-                            <div className="flex items-start gap-3">
-                              <div className="h-9 w-9 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
-                                {act.type === 'cv_uploaded' && <FileText className="w-4 h-4 text-emerald-500" />}
-                                {act.type === 'interview_completed' && <Video className="w-4 h-4 text-cyan-500" />}
-                                {act.type === 'badge_earned' && <Award className="w-4 h-4 text-purple-500" />}
-                              </div>
-                              <div>
-                                <h5 className="text-sm font-bold text-slate-900 dark:text-white">{isBn ? act.titleBn : act.titleEn}</h5>
-                                <p className="text-xs text-slate-500 mt-1">{isBn ? act.detailBn : act.detailEn}</p>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end gap-1 shrink-0">
-                              <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
-                              {act.score !== undefined && act.score > 0 && (
-                                <Badge variant={act.score > 80 ? 'brand' : 'info'}>{act.score}%</Badge>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
-                          <AlertCircle className="w-8 h-8 text-slate-500" />
-                          <p className="text-xs text-slate-400 font-bold">
-                            {isBn ? 'এখনো কোনো কার্যক্রম পাওয়া যায়নি।' : 'No activity recorded yet.'}
-                          </p>
-                          <p className="text-[10px] text-slate-500 max-w-sm px-4">
+                          <h2 className="text-xl sm:text-2xl font-display font-bold text-slate-900 dark:text-white mt-1">
+                            {isBn ? `স্বাগতম ব্যাক, ${user?.fullName}! 👋` : `Welcome back, ${user?.fullName}! 👋`}
+                          </h2>
+                          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 max-w-xl leading-relaxed">
                             {isBn 
-                              ? 'আপনার প্রথম লাইভ মক ভাইভা শুরু করতে ড্যাশবোর্ড থেকে "এআই সিভি এডিটর" মডিউলে একটি নতুন রেজুমে তৈরি করুন।' 
-                              : 'To get started, please build or upload a resume using the AI Smart CV module.'}
+                              ? 'আপনার সিভি স্কোর বৃদ্ধি করুন এবং এআই মক ভাইভা সেশনের মাধ্যমে পেশাদার পরিমণ্ডলে নিজের সক্ষমতা যাচাই করুন।' 
+                              : 'Maximize your hiring potential by analyzing your CV ATS scores and testing your interview performance against top domain standards.'}
                           </p>
+                          
+                          {missing.length > 0 && (
+                            <div className="mt-3">
+                              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1.5">{isBn ? 'অসম্পূর্ণ ঘরসমূহ:' : 'Remaining fields:'}</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {missing.slice(0, 4).map((f, i) => (
+                                  <span key={i} className="px-2 py-0.5 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-full text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                                    + {isBn ? f.labelBn : f.labelEn}
+                                  </span>
+                                ))}
+                                {missing.length > 4 && (
+                                  <span className="px-2 py-0.5 bg-slate-100 dark:bg-white/5 rounded-full text-[10px] font-medium text-slate-500">
+                                    +{missing.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+
+                        <div className="flex flex-col items-stretch sm:items-end gap-3 shrink-0 w-full md:w-auto">
+                          <div className="w-full md:w-48 bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                            <div 
+                              className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                              style={{ width: `${percent}%` }}
+                            />
+                          </div>
+                          <Button 
+                            variant={percent < 100 ? 'primary' : 'outline'} 
+                            size="sm" 
+                            onClick={() => setActiveTab('profile')}
+                            className="w-full justify-center"
+                          >
+                            <span>{isBn ? 'প্রোফাইল সম্পন্ন করুন' : 'Complete Profile'}</span>
+                            <ArrowUpRight className="w-4 h-4 ml-1" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Dynamic KPI Cards Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                    
+                    {/* KPI 1: Resumes Uploaded */}
+                    <div 
+                      onClick={() => setActiveTab('cv')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-emerald-500/40 dark:hover:border-emerald-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-emerald-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'সিভি ফাইল' : 'CV Files'}
+                        </span>
+                        <FileText className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+                          {resumes.length.toString().padStart(2, '0')}
+                        </p>
+                        <span className="text-[9px] text-emerald-500 font-bold block mt-1">
+                          {resumes.length > 0 ? (isBn ? 'সক্রিয় সিভি' : 'CV Active') : (isBn ? 'সিভি আপলোড করুন' : 'Upload CV')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KPI 2: Resume Score */}
+                    <div 
+                      onClick={() => setActiveTab('cv')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-purple-500/40 dark:hover:border-purple-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-purple-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'রেজুমে স্কোর' : 'Resume Score'}
+                        </span>
+                        <Cpu className="w-4 h-4 text-purple-500" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+                          {resumes.length > 0 
+                            ? `${Math.max(...resumes.map(r => r.scores?.overallScore || r.scores?.atsScore || 0), 0)}%`
+                            : 'N/A'}
+                        </p>
+                        <span className="text-[9px] text-purple-500 font-bold block mt-1">
+                          {resumes.length > 0 ? (isBn ? 'গড় এআই মূল্যায়ন' : 'Average AI Score') : (isBn ? 'সিভি চেক করুন' : 'Analyze CV')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KPI 3: ATS Score */}
+                    <div 
+                      onClick={() => setActiveTab('cv')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-cyan-500/40 dark:hover:border-cyan-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-cyan-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'এটিএস স্কোর' : 'ATS Score'}
+                        </span>
+                        <TrendingUp className="w-4 h-4 text-cyan-500" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+                          {resumes.length > 0 
+                            ? `${Math.max(...resumes.map(r => r.scores?.atsScore || 0), 0)}%`
+                            : 'N/A'}
+                        </p>
+                        <span className="text-[9px] text-cyan-500 font-bold block mt-1">
+                          {resumes.length > 0 ? (isBn ? 'সর্বোচ্চ এটিএস স্কোর' : 'Best ATS Check') : (isBn ? 'এটিএস রান করুন' : 'Run ATS Match')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KPI 4: Completed Interviews */}
+                    <div 
+                      onClick={() => setActiveTab('interview')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-blue-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'ভাইভা সম্পন্ন' : 'Vivis Tried'}
+                        </span>
+                        <Video className="w-4 h-4 text-blue-500" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+                          {sessions.filter(s => s.status === 'completed').length.toString().padStart(2, '0')}
+                        </p>
+                        <span className="text-[9px] text-blue-500 font-bold block mt-1">
+                          {isBn ? `মোট সেশন: ${sessions.length}` : `Sessions total: ${sessions.length}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KPI 5: Skill Passport */}
+                    <div 
+                      onClick={() => setActiveTab('passport')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-yellow-500/40 dark:hover:border-yellow-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-yellow-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'স্কিল পাসপোর্ট' : 'Skill Passport'}
+                        </span>
+                        <Award className="w-4 h-4 text-yellow-500" />
+                      </div>
+                      <div>
+                        <p className="text-xl font-bold text-slate-900 dark:text-white font-mono">
+                          {passportSkills.length.toString().padStart(2, '0')}
+                        </p>
+                        <span className="text-[9px] text-yellow-500 font-bold block mt-1">
+                          {passportSkills.length > 0 ? (isBn ? 'সার্টিফিকেট জেনারেটেড' : 'Passports Live') : (isBn ? 'পরীক্ষা দিন' : 'Take Exam')}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* KPI 6: Career Progress */}
+                    <div 
+                      onClick={() => setActiveTab('growth')}
+                      className="cursor-pointer p-4 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 rounded-2xl flex flex-col justify-between hover:border-teal-500/40 dark:hover:border-teal-500/40 transition-all group relative overflow-hidden"
+                    >
+                      <div className="absolute -right-4 -top-4 w-12 h-12 bg-teal-500/5 blur-xl rounded-full" />
+                      <div className="flex justify-between items-start mb-3">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                          {isBn ? 'ক্যারিয়ার লেভেল' : 'Career Hub'}
+                        </span>
+                        <Map className="w-4 h-4 text-teal-500" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-slate-900 dark:text-white leading-relaxed truncate">
+                          {passportSkills.length > 0 ? calculateLevel(stats.avgScore) : (isBn ? 'শিক্ষানবিশ' : 'Novice')}
+                        </p>
+                        <span className="text-[9px] text-teal-500 font-bold block mt-1">
+                          {isBn ? 'ক্যারিয়ার রোডম্যাপ হাব' : 'Career Growth Map'}
+                        </span>
+                      </div>
+                    </div>
+
+                  </div>
+
+                  {/* Quick Actions Panel */}
+                  <Card className="p-5">
+                    <h3 className="text-xs uppercase tracking-wider font-bold text-slate-400 mb-4">{isBn ? 'কুইক অ্যাকশনস' : 'Quick Actions'}</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      <button 
+                        onClick={() => setActiveTab('cv')}
+                        className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/[0.01] hover:bg-slate-100 dark:hover:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl transition-all gap-2 text-center"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                          <Plus className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'সিভি আপলোড করুন' : 'Upload Resume'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setActiveTab('interview')}
+                        className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/[0.01] hover:bg-slate-100 dark:hover:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl transition-all gap-2 text-center"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                          <Video className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'ভাইভা দিন' : 'Start AI Interview'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setActiveTab('passport')}
+                        className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/[0.01] hover:bg-slate-100 dark:hover:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl transition-all gap-2 text-center"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                          <Award className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'স্কিল পাসপোর্ট' : 'Open Passport'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setActiveTab('reports')}
+                        className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/[0.01] hover:bg-slate-100 dark:hover:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl transition-all gap-2 text-center"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center">
+                          <Download className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'রিপোর্ট ডাউনলোড' : 'Generate Report'}</span>
+                      </button>
+
+                      <button 
+                        onClick={() => setActiveTab('profile')}
+                        className="flex flex-col items-center justify-center p-4 bg-slate-50 dark:bg-white/[0.01] hover:bg-slate-100 dark:hover:bg-white/[0.03] border border-slate-200 dark:border-white/5 rounded-2xl transition-all gap-2 text-center col-span-2 md:col-span-1"
+                      >
+                        <div className="h-10 w-10 rounded-xl bg-teal-500/10 text-teal-500 flex items-center justify-center">
+                          <User className="w-5 h-5" />
+                        </div>
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'প্রোফাইল এডিট' : 'Edit Profile'}</span>
+                      </button>
                     </div>
                   </Card>
+
+                  {/* Main Analytical Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    
+                    {/* Chart 1: Interview Score Trend */}
+                    <Card className="p-6">
+                      <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+                        <div>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-sm">
+                            {isBn ? 'মক ভাইভা স্কোর ট্রেন্ড' : 'Interview Score Trend'}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{isBn ? 'প্রশ্নোত্তরের পারফরম্যান্স রেকর্ড' : 'Performance score over successive sessions'}</p>
+                        </div>
+                        <Video className="w-4 h-4 text-cyan-500" />
+                      </div>
+                      
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={getInterviewTrendData()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.15} />
+                            <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                            <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#090909', 
+                                border: '1px solid rgba(255,255,255,0.1)', 
+                                borderRadius: '12px' 
+                              }}
+                              labelClassName="text-slate-400 text-[10px]"
+                            />
+                            <Line type="monotone" dataKey="score" stroke="#06b6d4" strokeWidth={3} dot={{ fill: '#06b6d4', r: 4 }} activeDot={{ r: 6 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+
+                    {/* Chart 2: Resume Improvement */}
+                    <Card className="p-6">
+                      <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+                        <div>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-sm">
+                            {isBn ? 'রেজুমে স্কোর বনাম এটিএস অগ্রগতি' : 'Resume & ATS Improvement'}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{isBn ? 'সিভি ফাইল এনালাইসিস ট্র্যাকার' : 'ATS matching progress comparison over versions'}</p>
+                        </div>
+                        <FileText className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={getResumeImprovementData()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.15} />
+                            <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                            <YAxis domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#090909', 
+                                border: '1px solid rgba(255,255,255,0.1)', 
+                                borderRadius: '12px' 
+                              }}
+                              labelClassName="text-slate-400 text-[10px]"
+                            />
+                            <Legend wrapperStyle={{ fontSize: '10px' }} />
+                            <Area type="monotone" dataKey="ATS Score" stroke="#10b981" fillOpacity={0.1} fill="url(#colorAts)" />
+                            <Area type="monotone" dataKey="Resume Score" stroke="#8b5cf6" fillOpacity={0.05} fill="url(#colorResume)" />
+                            <defs>
+                              <linearGradient id="colorAts" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="colorResume" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+
+                    {/* Chart 3: Skill Distribution */}
+                    <Card className="p-6">
+                      <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+                        <div>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-sm">
+                            {isBn ? 'প্রধান কারিগরি দক্ষতার বিবরণ' : 'Top Tech Skill Scores'}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{isBn ? 'যাচাইকৃত দক্ষতার স্কিল লেভেল বিবরণ' : 'Assessed competency metrics for top domains'}</p>
+                        </div>
+                        <Award className="w-4 h-4 text-purple-500" />
+                      </div>
+                      
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={getSkillDistributionData()} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.1} />
+                            <XAxis type="number" domain={[0, 100]} stroke="#64748b" fontSize={10} tickLine={false} />
+                            <YAxis dataKey="name" type="category" stroke="#64748b" fontSize={10} tickLine={false} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#090909', 
+                                border: '1px solid rgba(255,255,255,0.1)', 
+                                borderRadius: '12px' 
+                              }}
+                            />
+                            <Bar dataKey="score" fill="#8b5cf6" radius={[0, 8, 8, 0]} barSize={12} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+
+                    {/* Chart 4: Weekly Activity Summary */}
+                    <Card className="p-6">
+                      <div className="flex justify-between items-center pb-4 border-b border-slate-100 dark:border-white/5 mb-6">
+                        <div>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-sm">
+                            {isBn ? 'সাপ্তাহিক প্ল্যাটফর্ম অ্যাক্টিভিটি' : 'Weekly Activity Metrics'}
+                          </h4>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{isBn ? 'গত ৭ দিনের সিভি এবং ভাইভা ইভেন্টস' : 'Volume of uploads and trials over last 7 days'}</p>
+                        </div>
+                        <Map className="w-4 h-4 text-emerald-500" />
+                      </div>
+                      
+                      <div className="h-64 w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={getWeeklyActivityData()}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.1} />
+                            <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} />
+                            <YAxis stroke="#64748b" fontSize={10} tickLine={false} />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#090909', 
+                                border: '1px solid rgba(255,255,255,0.1)', 
+                                borderRadius: '12px' 
+                              }}
+                            />
+                            <Legend wrapperStyle={{ fontSize: '10px' }} />
+                            <Bar dataKey={isBn ? 'সিভি আপলোড' : 'CV Upload'} fill="#10b981" stackId="a" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey={isBn ? 'ভাইভা সেশন' : 'Viva Sessions'} fill="#06b6d4" stackId="a" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey={isBn ? 'রিপোর্ট' : 'Reports'} fill="#8b5cf6" stackId="a" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </Card>
+
+                  </div>
+
+                  {/* Secondary Information Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* Recent Activity Timeline */}
+                    <Card className="lg:col-span-2 flex flex-col gap-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <h4 className="font-display font-bold text-slate-900 dark:text-white">{t('recentActivity')}</h4>
+                        <span className="text-xs font-semibold text-slate-400">
+                          {isBn 
+                            ? `${dynamicActivities.length}টি কার্যক্রম পাওয়া গেছে` 
+                            : `${dynamicActivities.length} records found`}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-col gap-4">
+                        {loadingStats ? (
+                          <div className="py-8 text-center text-xs text-slate-400 animate-pulse">
+                            {isBn ? 'কার্যক্রম লোড হচ্ছে...' : 'Loading recent activities...'}
+                          </div>
+                        ) : dynamicActivities.length > 0 ? (
+                          dynamicActivities.map((act) => (
+                            <div key={act.id} className="flex justify-between items-start p-3 bg-slate-50 dark:bg-slate-900/40 rounded-xl border border-slate-100 dark:border-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-900 transition-all">
+                              <div className="flex items-start gap-3">
+                                <div className="h-9 w-9 rounded-xl bg-brand-green/10 text-brand-green flex items-center justify-center shrink-0">
+                                  {act.type === 'cv_uploaded' && <FileText className="w-4 h-4 text-emerald-500" />}
+                                  {act.type === 'interview_completed' && <Video className="w-4 h-4 text-cyan-500" />}
+                                  {act.type === 'badge_earned' && <Award className="w-4 h-4 text-purple-500" />}
+                                </div>
+                                <div>
+                                  <h5 className="text-sm font-bold text-slate-900 dark:text-white">{isBn ? act.titleBn : act.titleEn}</h5>
+                                  <p className="text-xs text-slate-500 mt-1">{isBn ? act.detailBn : act.detailEn}</p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end gap-1 shrink-0">
+                                <span className="text-[10px] text-slate-400 font-medium">{act.time}</span>
+                                {act.score !== undefined && act.score > 0 && (
+                                  <Badge variant={act.score > 80 ? 'brand' : 'info'}>{act.score}%</Badge>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <AlertCircle className="w-8 h-8 text-slate-500" />
+                            <p className="text-xs text-slate-400 font-bold">
+                              {isBn ? 'এখনো কোনো কার্যক্রম পাওয়া যায়নি।' : 'No activity recorded yet.'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 max-w-sm px-4">
+                              {isBn 
+                                ? 'আপনার প্রথম লাইভ মক ভাইভা শুরু করতে ড্যাশবোর্ড থেকে "এআই সিভি এডিটর" মডিউলে একটি নতুন রেজুমে তৈরি করুন।' 
+                                : 'To get started, please build or upload a resume using the AI Smart CV module.'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                    {/* Recent Reports Section */}
+                    <Card className="flex flex-col gap-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-slate-800">
+                        <h4 className="font-display font-bold text-slate-900 dark:text-white">{isBn ? 'সাম্প্রতিক এআই রিপোর্ট' : 'Recent AI Reports'}</h4>
+                        <button 
+                          type="button"
+                          onClick={() => setActiveTab('reports')}
+                          className="text-xs font-bold text-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1"
+                        >
+                          <span>{isBn ? 'সবগুলো দেখুন' : 'View All'}</span>
+                          <ArrowUpRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                      
+                      <div className="flex flex-col gap-3">
+                        {reportsList.length > 0 ? (
+                          reportsList.slice(0, 4).map((rep) => (
+                            <div key={rep.id} className="p-3 bg-slate-50 dark:bg-white/[0.01] border border-slate-100 dark:border-white/5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/[0.03] transition-all flex justify-between items-center">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="h-8 w-8 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-500 flex items-center justify-center shrink-0">
+                                  <Download className="w-3.5 h-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h5 className="text-xs font-bold text-slate-900 dark:text-white truncate">{rep.title}</h5>
+                                  <p className="text-[9px] text-slate-400 mt-0.5 font-mono">{new Date(rep.createdAt).toLocaleDateString(language === 'bn' ? 'bn-BD' : 'en-US')}</p>
+                                </div>
+                              </div>
+                              <Button variant="ghost" size="xs" onClick={() => setActiveTab('reports')} className="shrink-0">
+                                <span className="text-[10px]">{isBn ? 'ডাউনলোড' : 'Download'}</span>
+                              </Button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="py-8 text-center flex flex-col items-center justify-center gap-2">
+                            <AlertCircle className="w-6 h-6 text-slate-500" />
+                            <p className="text-xs text-slate-400">
+                              {isBn ? 'কোনো রিপোর্ট এখনও জেনারেট করা হয়নি।' : 'No reports generated yet.'}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+
+                  </div>
+
+                  {/* Real-time Api Indicators Live Status Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
+                      <div className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'গ্রক এআই ইঞ্জিন' : 'Groq AI Engine'}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'অনলাইন / প্রস্তুত' : 'Online / Ready'}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
+                      <div className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'সুপাবেস ডাটাবেজ' : 'Supabase Sync'}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium">{cvDb.isConfigured() ? (isBn ? 'সংযুক্ত / রিয়েল-টাইম' : 'Connected / Real-time') : (isBn ? 'নিরাপদ লোকাল স্টোরেজ' : 'Local Sandbox Mode')}</p>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
+                      <div className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'ক্লাউড স্টোরেজ' : 'Storage Vault'}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium">{cvDb.isConfigured() ? (isBn ? 'সক্রিয় / সুরক্ষিত' : 'Cloud Storage Active') : (isBn ? 'লোকাল ক্যাশে মেমরি' : 'Local Storage Cache')}</p>
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
               )}
 
@@ -698,229 +1508,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
 
               {/* TAB 9: PROFILE PAGE (আমার প্রোফাইল) */}
               {activeTab === 'profile' && (
-                <div className="max-w-4xl mx-auto flex flex-col gap-8">
-                  <PageHeader 
-                    title={t('menuProfile')}
-                    description={isBn ? 'পেশাদার ও কারিগরি তথ্যসমূহ এডিট ও আপডেট করুন।' : 'Update your personal details, academic accomplishments, and skills portfolio.'}
-                  >
-                    {!isEditingProfile && (
-                      <Button variant="outline" size="sm" onClick={() => setIsEditingProfile(true)}>
-                        <Edit2 className="w-4 h-4" />
-                        <span>{isBn ? 'এডিট করুন' : 'Edit Profile'}</span>
-                      </Button>
-                    )}
-                  </PageHeader>
-
-                  {isEditingProfile ? (
-                    <Card className="bg-white dark:bg-slate-900">
-                      <form onSubmit={handleProfileSave} className="flex flex-col gap-5">
-                        
-                        <div className="flex flex-col md:flex-row items-center gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
-                          <img 
-                            src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                            alt="Avatar" 
-                            className="w-24 h-24 rounded-2xl object-cover border-2 border-slate-200 dark:border-slate-800" 
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="flex flex-col gap-2 w-full">
-                            <label className="text-xs font-semibold text-slate-500">{isBn ? 'প্রোফাইল ছবি পরিবর্তন করুন' : 'Change Profile Picture'}</label>
-                            <div className="flex flex-wrap gap-2 items-center">
-                              <input 
-                                type="file" 
-                                accept="image/*"
-                                id="avatarUpload"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  setUploadingAvatar(true);
-                                  const { success, error } = await uploadProfilePicture(file);
-                                  setUploadingAvatar(false);
-                                  if (!success) alert(error || 'Failed to upload picture');
-                                }}
-                              />
-                              <Button 
-                                variant="outline" 
-                                type="button" 
-                                size="sm" 
-                                disabled={uploadingAvatar}
-                                onClick={() => document.getElementById('avatarUpload')?.click()}
-                              >
-                                {uploadingAvatar ? (isBn ? 'আপলোড হচ্ছে...' : 'Uploading...') : (isBn ? 'নতুন ছবি আপলোড' : 'Upload New Picture')}
-                              </Button>
-                              {user?.avatarUrl && (
-                                <Button 
-                                  variant="ghost" 
-                                  type="button" 
-                                  size="sm"
-                                  className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                                  onClick={async () => {
-                                    if(confirm(isBn ? 'আপনি কি নিশ্চিত?' : 'Are you sure?')) {
-                                      await deleteProfilePicture();
-                                    }
-                                  }}
-                                >
-                                  {isBn ? 'ছবি মুছুন' : 'Remove Picture'}
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-5">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-slate-500">{t('authFullName')}</label>
-                            <input 
-                              type="text" 
-                              value={fullNameInput}
-                              onChange={(e) => setFullNameInput(e.target.value)}
-                              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-slate-500">{isBn ? 'ফোন নম্বর' : 'Phone Number'}</label>
-                            <input 
-                              type="text" 
-                              value={phoneInput}
-                              onChange={(e) => setPhoneInput(e.target.value)}
-                              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-slate-500">{t('profEducation')}</label>
-                          <input 
-                            type="text" 
-                            value={educationInput}
-                            onChange={(e) => setEducationInput(e.target.value)}
-                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-slate-500">{t('profExperience')}</label>
-                          <textarea 
-                            value={experienceInput}
-                            onChange={(e) => setExperienceInput(e.target.value)}
-                            rows={3}
-                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                          />
-                        </div>
-
-                        <div className="flex flex-col gap-1.5">
-                          <label className="text-xs font-semibold text-slate-500">{t('profSkills')} (কমা দিয়ে আলাদা করুন)</label>
-                          <input 
-                            type="text" 
-                            value={skillsInput}
-                            onChange={(e) => setSkillsInput(e.target.value)}
-                            placeholder="React, TypeScript, CSS"
-                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                          />
-                        </div>
-
-                        <div className="grid md:grid-cols-2 gap-5">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-slate-500">GitHub Link</label>
-                            <input 
-                              type="text" 
-                              value={githubInput}
-                              onChange={(e) => setGithubInput(e.target.value)}
-                              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-semibold text-slate-500">LinkedIn Link</label>
-                            <input 
-                              type="text" 
-                              value={linkedinInput}
-                              onChange={(e) => setLinkedinInput(e.target.value)}
-                              className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand-green"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex gap-2 justify-end mt-4">
-                          <Button variant="outline" type="button" onClick={() => setIsEditingProfile(false)}>
-                            {t('cancel')}
-                          </Button>
-                          <Button variant="primary" type="submit">
-                            {t('save')}
-                          </Button>
-                        </div>
-                      </form>
-                    </Card>
-                  ) : (
-                    <div className="grid md:grid-cols-3 gap-8">
-                      {/* Avatar & Basics */}
-                      <Card className="md:col-span-1 flex flex-col items-center text-center gap-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
-                        <img 
-                          src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
-                          alt="Avatar" 
-                          className="w-24 h-24 rounded-2xl object-cover border-2 border-brand-green/20" 
-                          referrerPolicy="no-referrer"
-                        />
-                        <div>
-                          <h3 className="font-bold text-slate-900 dark:text-white leading-tight">{user?.fullName}</h3>
-                          <span className="text-xs text-slate-400 block mt-1">{user?.email}</span>
-                          {user?.phone && <span className="text-xs text-slate-400 block mt-0.5">{user.phone}</span>}
-                        </div>
-
-                        {/* Social linkages */}
-                        <div className="flex gap-3 mt-2">
-                          {user?.socialLinks?.github && (
-                            <a href={user.socialLinks.github} target="_blank" rel="noreferrer" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:text-white hover:bg-slate-800 transition-all text-xs font-mono">
-                              GitHub
-                            </a>
-                          )}
-                          {user?.socialLinks?.linkedin && (
-                            <a href={user.socialLinks.linkedin} target="_blank" rel="noreferrer" className="p-2 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-600 dark:text-slate-300 hover:text-white hover:bg-slate-800 transition-all text-xs font-mono">
-                              LinkedIn
-                            </a>
-                          )}
-                        </div>
-                      </Card>
-
-                      {/* Professional details */}
-                      <div className="md:col-span-2 flex flex-col gap-6">
-                        {/* Education */}
-                        <Card className="flex flex-col gap-3">
-                          <div className="flex items-center gap-2.5 text-brand-green pb-2 border-b border-slate-100 dark:border-slate-800">
-                            <GraduationCap className="w-5 h-5" />
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">{t('profEducation')}</h4>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                            {user?.education || (isBn ? 'কোনো শিক্ষাগত যোগ্যতা এখনও যোগ করা হয়নি।' : 'No academic highlights updated yet.')}
-                          </p>
-                        </Card>
-
-                        {/* Experience */}
-                        <Card className="flex flex-col gap-3">
-                          <div className="flex items-center gap-2.5 text-brand-blue pb-2 border-b border-slate-100 dark:border-slate-800">
-                            <Briefcase className="w-5 h-5" />
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">{t('profExperience')}</h4>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                            {user?.experience || (isBn ? 'কোনো কাজের অভিজ্ঞতা এখনও যোগ করা হয়নি।' : 'No professional logs updated yet.')}
-                          </p>
-                        </Card>
-
-                        {/* Skills Passport badges spotlight */}
-                        <Card className="flex flex-col gap-3">
-                          <div className="flex items-center gap-2.5 text-purple-500 pb-2 border-b border-slate-100 dark:border-slate-800">
-                            <Award className="w-5 h-5" />
-                            <h4 className="font-bold text-slate-900 dark:text-white text-sm">{t('profSkills')}</h4>
-                          </div>
-                          <div className="flex flex-wrap gap-2 pt-1">
-                            {user?.skills.map((skill, index) => (
-                              <Badge key={index} variant="brand">{skill}</Badge>
-                            ))}
-                          </div>
-                        </Card>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <ProfileTab
+                  user={user}
+                  isBn={isBn}
+                  saveStatus={saveStatus}
+                  fullNameInput={fullNameInput}
+                  setFullNameInput={setFullNameInput}
+                  phoneInput={phoneInput}
+                  setPhoneInput={setPhoneInput}
+                  universityInput={universityInput}
+                  setUniversityInput={setUniversityInput}
+                  departmentInput={departmentInput}
+                  setDepartmentInput={setDepartmentInput}
+                  semesterInput={semesterInput}
+                  setSemesterInput={setSemesterInput}
+                  addressInput={addressInput}
+                  setAddressInput={setAddressInput}
+                  bioInput={bioInput}
+                  setBioInput={setBioInput}
+                  skillsInput={skillsInput}
+                  setSkillsInput={setSkillsInput}
+                  educationInput={educationInput}
+                  setEducationInput={setEducationInput}
+                  experienceInput={experienceInput}
+                  setExperienceInput={setExperienceInput}
+                  githubInput={githubInput}
+                  setgithubInput={setGithubInput}
+                  linkedinInput={linkedinInput}
+                  setlinkedinInput={setLinkedinInput}
+                  portfolioInput={portfolioInput}
+                  setportfolioInput={setPortfolioInput}
+                  calculateProfileCompletion={calculateProfileCompletion}
+                  handleAvatarFileChange={handleAvatarFileChange}
+                  deleteProfilePicture={deleteProfilePicture}
+                  uploadingAvatar={uploadingAvatar}
+                  showAvatarCropModal={showAvatarCropModal}
+                  setShowAvatarCropModal={setShowAvatarCropModal}
+                  avatarPreviewUrl={avatarPreviewUrl}
+                  setAvatarPreviewUrl={setAvatarPreviewUrl}
+                  setSelectedAvatarFile={setSelectedAvatarFile}
+                  avatarZoom={avatarZoom}
+                  setAvatarZoom={setAvatarZoom}
+                  avatarQuality={avatarQuality}
+                  setAvatarQuality={setAvatarQuality}
+                  handleCropAndUpload={handleCropAndUpload}
+                  t={t}
+                />
               )}
 
               {/* TAB 10: SETTINGS PAGE (সেটিংস ও নিরাপত্তা) */}

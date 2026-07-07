@@ -73,6 +73,14 @@ class SupabaseAuthSimulator {
             experience: profileData.experience || undefined,
             skills: profileData.skills || [],
             socialLinks: profileData.social_links || undefined,
+            address: profileData.address || profileData.social_links?.address || undefined,
+            university: profileData.university || profileData.social_links?.university || undefined,
+            department: profileData.department || profileData.social_links?.department || undefined,
+            semester: profileData.semester || profileData.social_links?.semester || undefined,
+            linkedin: profileData.linkedin || profileData.social_links?.linkedin || undefined,
+            github: profileData.github || profileData.social_links?.github || undefined,
+            portfolio: profileData.portfolio || profileData.social_links?.portfolio || undefined,
+            bio: profileData.bio || profileData.social_links?.bio || undefined,
             createdAt: profileData.created_at || new Date().toISOString()
           };
           return userProfile;
@@ -163,6 +171,14 @@ class SupabaseAuthSimulator {
           experience: profileData.experience || undefined,
           skills: profileData.skills || [],
           socialLinks: profileData.social_links || undefined,
+          address: profileData.address || profileData.social_links?.address || undefined,
+          university: profileData.university || profileData.social_links?.university || undefined,
+          department: profileData.department || profileData.social_links?.department || undefined,
+          semester: profileData.semester || profileData.social_links?.semester || undefined,
+          linkedin: profileData.linkedin || profileData.social_links?.linkedin || undefined,
+          github: profileData.github || profileData.social_links?.github || undefined,
+          portfolio: profileData.portfolio || profileData.social_links?.portfolio || undefined,
+          bio: profileData.bio || profileData.social_links?.bio || undefined,
           createdAt: profileData.created_at || new Date().toISOString()
         };
 
@@ -229,6 +245,14 @@ class SupabaseAuthSimulator {
             experience: profileData?.experience || undefined,
             skills: profileData?.skills || [],
             socialLinks: profileData?.social_links || undefined,
+            address: profileData?.address || profileData?.social_links?.address || undefined,
+            university: profileData?.university || profileData?.social_links?.university || undefined,
+            department: profileData?.department || profileData?.social_links?.department || undefined,
+            semester: profileData?.semester || profileData?.social_links?.semester || undefined,
+            linkedin: profileData?.linkedin || profileData?.social_links?.linkedin || undefined,
+            github: profileData?.github || profileData?.social_links?.github || undefined,
+            portfolio: profileData?.portfolio || profileData?.social_links?.portfolio || undefined,
+            bio: profileData?.bio || profileData?.social_links?.bio || undefined,
             createdAt: profileData?.created_at || user.created_at
           };
           return { data: { user: userProfile }, error: null };
@@ -265,14 +289,38 @@ class SupabaseDatabaseSimulator {
   async updateProfile(userId: string, updates: Partial<UserProfile>) {
     if (isRealSupabase && supabaseClient) {
       try {
-        const dbUpdates: any = {};
+        const dbUpdates: any = {
+          updated_at: new Date().toISOString()
+        };
+        
+        // Map camelCase to snake_case for Supabase columns
         if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
         if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
         if (updates.education !== undefined) dbUpdates.education = updates.education;
         if (updates.experience !== undefined) dbUpdates.experience = updates.experience;
         if (updates.skills !== undefined) dbUpdates.skills = updates.skills;
-        if (updates.socialLinks !== undefined) dbUpdates.social_links = updates.socialLinks;
         if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = updates.avatarUrl;
+        if (updates.address !== undefined) dbUpdates.address = updates.address;
+        if (updates.university !== undefined) dbUpdates.university = updates.university;
+        if (updates.department !== undefined) dbUpdates.department = updates.department;
+        if (updates.semester !== undefined) dbUpdates.semester = updates.semester;
+        if (updates.linkedin !== undefined) dbUpdates.linkedin = updates.linkedin;
+        if (updates.github !== undefined) dbUpdates.github = updates.github;
+        if (updates.portfolio !== undefined) dbUpdates.portfolio = updates.portfolio;
+        if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
+
+        // Maintain nested social_links structure for legacy queries and backward-compatibility
+        const currentSocial = updates.socialLinks || {};
+        dbUpdates.social_links = {
+          github: updates.github !== undefined ? updates.github : currentSocial.github || '',
+          linkedin: updates.linkedin !== undefined ? updates.linkedin : currentSocial.linkedin || '',
+          portfolio: updates.portfolio !== undefined ? updates.portfolio : currentSocial.portfolio || '',
+          address: updates.address !== undefined ? updates.address : currentSocial.address || '',
+          university: updates.university !== undefined ? updates.university : currentSocial.university || '',
+          department: updates.department !== undefined ? updates.department : currentSocial.department || '',
+          semester: updates.semester !== undefined ? updates.semester : currentSocial.semester || '',
+          bio: updates.bio !== undefined ? updates.bio : currentSocial.bio || ''
+        };
 
         const { data, error } = await supabaseClient
           .from('profiles')
@@ -293,6 +341,14 @@ class SupabaseDatabaseSimulator {
           experience: data.experience || undefined,
           skills: data.skills || [],
           socialLinks: data.social_links || undefined,
+          address: data.address || data.social_links?.address || undefined,
+          university: data.university || data.social_links?.university || undefined,
+          department: data.department || data.social_links?.department || undefined,
+          semester: data.semester || data.social_links?.semester || undefined,
+          linkedin: data.linkedin || data.social_links?.linkedin || undefined,
+          github: data.github || data.social_links?.github || undefined,
+          portfolio: data.portfolio || data.social_links?.portfolio || undefined,
+          bio: data.bio || data.social_links?.bio || undefined,
           createdAt: data.created_at || new Date().toISOString()
         };
 
@@ -398,6 +454,7 @@ class SupabaseDatabaseSimulator {
 
     if (isRealSupabase && supabaseClient) {
       try {
+        // ১. বাকেটটি আছে কিনা চেক করি বা সরাসরি আপলোড করি
         let { error: uploadError } = await supabaseClient.storage
           .from('avatars')
           .upload(filePath, file, {
@@ -405,18 +462,28 @@ class SupabaseDatabaseSimulator {
             upsert: true
           });
 
-        if (uploadError && (uploadError.message?.includes('not found') || uploadError.message?.includes('Bucket') || uploadError.message?.includes('does not exist'))) {
-          console.warn('⚠️ avatars bucket not found, attempting to create programmatically...');
-          try {
-            await supabaseClient.storage.createBucket('avatars', { public: true });
-            const { error: retryError } = await supabaseClient.storage
-              .from('avatars')
-              .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: true
-              });
-            uploadError = retryError;
-          } catch (e) {}
+        // যদি বাকেট না পাওয়া যায় বা পারমিশন না থাকে
+        if (uploadError && (
+          uploadError.message?.includes('not found') || 
+          uploadError.message?.includes('Bucket') || 
+          uploadError.message?.includes('does not exist') ||
+          uploadError.message?.includes('violates row-level security policy') ||
+          (uploadError as any).status === 404
+        )) {
+          console.warn('⚠️ avatars bucket issue, falling back to Base64 storage...');
+          
+          // Fallback: Convert to Base64 and store directly in the profile
+          const base64: string = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          
+          // প্রোফাইলে আপডেট করি (Save Base64 to profile as fallback)
+          await this.updateProfile(userId, { avatarUrl: base64 });
+          
+          return { success: true, url: base64, error: null };
         }
 
         if (uploadError) throw uploadError;

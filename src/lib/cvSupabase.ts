@@ -290,26 +290,16 @@ export const cvDb = {
             upsert: true
           });
 
-        // বাকেট না থাকলে তৈরি করার চেষ্টা করা
-        if (uploadError && (uploadError.message?.includes('not found') || uploadError.message?.includes('Bucket') || uploadError.message?.includes('does not exist'))) {
-          console.warn('⚠️ cv_storage bucket not found, attempting to create it programmatically...');
-          try {
-            const { error: createError } = await supabaseClient.storage.createBucket('cv_storage', {
-              public: true
-            });
-            if (!createError) {
-              console.log('✅ cv_storage bucket created successfully. Retrying upload...');
-              const { error: retryError } = await supabaseClient.storage
-                .from('cv_storage')
-                .upload(filePath, file, {
-                  cacheControl: '3600',
-                  upsert: true
-                });
-              uploadError = retryError;
-            }
-          } catch (createErr) {
-            console.error('Failed to create bucket:', createErr);
-          }
+        // বাকেট না থাকলে বা পারমিশন না থাকলে এরর হ্যান্ডলিং
+        if (uploadError && (
+          uploadError.message?.includes('not found') || 
+          uploadError.message?.includes('Bucket') || 
+          uploadError.message?.includes('does not exist') ||
+          uploadError.message?.includes('violates row-level security policy') ||
+          (uploadError as any).status === 404
+        )) {
+          console.error('❌ Supabase Storage Error:', uploadError.message);
+          throw new Error('সুপাবেজ স্টোরেজে "cv_storage" বাকেটটি তৈরি করা নেই অথবা পারমিশন নেই। দয়া করে সুপাবেজ ড্যাশবোর্ড থেকে "cv_storage" নামে একটি Public Bucket তৈরি করুন এবং RLS পলিসি চেক করুন। (Storage bucket "cv_storage" not found or RLS policy violation. Please create a public bucket named "cv_storage" in your Supabase dashboard.)');
         }
 
         if (uploadError) {
