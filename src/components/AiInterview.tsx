@@ -84,6 +84,14 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [displayedQuestion, setDisplayedQuestion] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  
+  // MediaRecorder API for audio/video recording
+  const [isMediaRecording, setIsMediaRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // লোকাল টোস্ট নোটিফিকেশন সিস্টেম (Local Toast Notification System)
@@ -541,6 +549,61 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     }
     setIsRecording(false);
     setInterimTranscript('');
+  };
+
+  // ==========================================
+  // মিডিয়া রেকর্ডিং (Media Recording API - Audio/Video)
+  // ==========================================
+  const startMediaRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      streamRef.current = stream;
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) {
+          chunksRef.current.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        setRecordedBlob(blob);
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsMediaRecording(true);
+      setRecordedBlob(null);
+      
+      // Also start speech recognition for transcript
+      startRecording();
+    } catch (err) {
+      console.error('Error starting media recording:', err);
+      showLocalToast(
+        isBn ? 'মাইক্রোফোন অ্যাক্সেস করতে সমস্যা হয়েছে!' : 'Error accessing microphone!',
+        'error'
+      );
+    }
+  };
+
+  const stopMediaRecording = () => {
+    if (mediaRecorderRef.current && isMediaRecording) {
+      mediaRecorderRef.current.stop();
+      setIsMediaRecording(false);
+      stopRecording();
+    }
+  };
+
+  const playRecordedAudio = () => {
+    if (recordedBlob) {
+      const url = URL.createObjectURL(recordedBlob);
+      const audio = new Audio(url);
+      audio.play();
+    }
   };
 
   // ==========================================
@@ -1842,17 +1905,27 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
                   {speechSupported && (
                     <div className="absolute right-4 top-4 flex flex-col gap-2">
                       <button 
-                        onClick={toggleRecording}
+                        onClick={isMediaRecording ? stopMediaRecording : startMediaRecording}
                         disabled={isSubmittingAnswer}
                         className={`p-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center border-2 ${
-                          isRecording 
+                          isMediaRecording 
                             ? 'bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_18px_rgba(239,68,68,0.5)]' 
                             : 'bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 border-slate-200 dark:border-slate-800/80 hover:border-emerald-500/50'
                         }`}
-                        title={isRecording ? (isBn ? 'রেকর্ডিং বন্ধ করুন' : 'Stop voice recording') : (isBn ? 'কথা বলা শুরু করুন' : 'Start voice recording')}
+                        title={isMediaRecording ? (isBn ? 'রেকর্ডিং বন্ধ করুন' : 'Stop recording answer') : (isBn ? 'উত্তর রেকর্ড করুন' : 'Record answer audio')}
                       >
-                        {isRecording ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-emerald-500" />}
+                        {isMediaRecording ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-emerald-500" />}
                       </button>
+                      
+                      {recordedBlob && !isMediaRecording && (
+                        <button 
+                          onClick={playRecordedAudio}
+                          className="p-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-xl border border-emerald-500/30 transition-all flex items-center justify-center"
+                          title={isBn ? 'রেকর্ডিং শুনুন' : 'Listen to recording'}
+                        >
+                          <Play className="w-4 h-4 fill-emerald-500" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

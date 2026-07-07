@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge } from './UI';
 import { passportDb, calculateLevel } from '../lib/passportSupabase';
 import { SkillPassport, PassportSkill, PassportHistoryItem } from '../types/passport';
+import { SkillsOverview } from './SkillsOverview';
 
 export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { isBn, t } = useLanguage();
@@ -90,6 +91,10 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
 
   // এআই স্কিল পাসপোর্ট কার্ড প্রিন্ট/ডাউনলোড করা (Trigger Print layout for Premium Passport Card)
   const handlePrintCard = () => {
+    window.print();
+  };
+
+  const handleDownloadFullPassport = () => {
     window.print();
   };
 
@@ -210,8 +215,17 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
               <Button 
                 variant="outline" 
                 size="sm" 
+                onClick={handleDownloadFullPassport}
+                className="flex-1 sm:flex-none justify-center print:hidden"
+              >
+                <Download className="w-4 h-4 text-cyan-400" />
+                <span>{isBn ? 'ডাউনলোড' : 'Download'}</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
                 onClick={() => setShowShareModal(true)}
-                className="flex-1 sm:flex-none justify-center"
+                className="flex-1 sm:flex-none justify-center print:hidden"
               >
                 <Share2 className="w-4 h-4 text-emerald-400" />
                 <span>{isBn ? 'শেয়ার' : 'Share'}</span>
@@ -220,7 +234,7 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
                 variant="primary" 
                 size="sm" 
                 onClick={() => setShowPassportCardModal(true)}
-                className="flex-1 sm:flex-none justify-center"
+                className="flex-1 sm:flex-none justify-center print:hidden"
               >
                 <Smartphone className="w-4 h-4" />
                 <span>{isBn ? 'ডিজিটাল কার্ড' : 'Digital Card'}</span>
@@ -231,7 +245,10 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
         </div>
       </Card>
 
-      {/* ২. স্কিল গ্রিড এরিয়া (SKILL PASSPORT BENTO GRID) */}
+      {/* ২. দক্ষতা ওভারভিউ চার্ট (SKILLS VISUAL OVERVIEW) */}
+      <SkillsOverview skills={skills} />
+
+      {/* ৩. স্কিল গ্রিড এরিয়া (SKILL PASSPORT BENTO GRID) */}
       <div>
         <div className="flex justify-between items-center mb-6">
           <div>

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Edit2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Edit2, CheckCircle2, AlertCircle, Linkedin, RefreshCw, Briefcase, Award } from 'lucide-react';
 import { Card, Badge, Button, PageHeader } from './UI';
 
 interface ProfileTabProps {
@@ -254,6 +254,36 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
 
             <div className="grid md:grid-cols-2 gap-5">
+              {/* LinkedIn Connection Card */}
+              <div className="md:col-span-2 bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-[#0077B5] text-white rounded-xl shadow-lg">
+                    <Linkedin className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-900 dark:text-white text-sm">
+                      {isBn ? 'লিঙ্কডইন কানেক্ট করুন' : 'Connect LinkedIn Profile'}
+                    </h5>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+                      {isBn 
+                        ? 'আপনার লিঙ্কডইন প্রোফাইল কানেক্ট করে অটোমেটিক কাজের অভিজ্ঞতা ও স্কিলগুলো স্কিলপ্রুফ পাসপোর্টে যোগ করুন।' 
+                        : 'Link your LinkedIn profile to automatically pull work experience, education, and skills into your SkillProof passport.'}
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="bg-[#0077B5]/10 text-[#0077B5] border-[#0077B5]/20 hover:bg-[#0077B5] hover:text-white transition-all whitespace-nowrap"
+                  onClick={() => {
+                    alert(isBn ? 'লিঙ্কডইন অথেন্টিকেশন ফিচারটি শীঘ্রই আসছে!' : 'LinkedIn OAuth feature integration is coming soon! This will securely sync your professional data.');
+                  }}
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                  {isBn ? 'কানেক্ট ও সিঙ্ক' : 'Connect & Sync'}
+                </Button>
+              </div>
+
               {/* Full name input */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-bold text-slate-500 dark:text-slate-400">{isBn ? 'পূর্ণ নাম' : 'Full Name'}</label>

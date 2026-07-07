@@ -65,10 +65,10 @@ class SupabaseAuthSimulator {
         if (profileData) {
           const userProfile: UserProfile = {
             id: profileData.id,
-            fullName: profileData.full_name,
-            email: profileData.email,
+            fullName: profileData.full_name || profileData.fullName || '',
+            email: profileData.email || '',
             phone: profileData.phone || undefined,
-            avatarUrl: profileData.avatar_url || undefined,
+            avatarUrl: profileData.avatar_url || profileData.avatarUrl || undefined,
             education: profileData.education || undefined,
             experience: profileData.experience || undefined,
             skills: profileData.skills || [],
@@ -324,8 +324,10 @@ class SupabaseDatabaseSimulator {
 
         const { data, error } = await supabaseClient
           .from('profiles')
-          .update(dbUpdates)
-          .eq('id', userId)
+          .upsert({
+            id: userId,
+            ...dbUpdates
+          })
           .select()
           .single();
 
@@ -333,10 +335,10 @@ class SupabaseDatabaseSimulator {
 
         const updatedProfile: UserProfile = {
           id: data.id,
-          fullName: data.full_name,
+          fullName: data.full_name || data.fullName,
           email: data.email,
           phone: data.phone || undefined,
-          avatarUrl: data.avatar_url || undefined,
+          avatarUrl: data.avatar_url || data.avatarUrl || undefined,
           education: data.education || undefined,
           experience: data.experience || undefined,
           skills: data.skills || [],
