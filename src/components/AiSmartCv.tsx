@@ -26,6 +26,7 @@ interface AiSmartCvProps {
   userId: string;
   isBn: boolean;
   onBack: () => void;
+  onUpdate?: () => void;
 }
 
 // ইন-মেমোরি সফল বা ব্যর্থ মেসেজ দেখানোর জন্য কাস্টম টোস্ট মেকানিজম (Custom Toast)
@@ -37,7 +38,7 @@ interface Toast {
 
 import { extractTextFromFile } from '../lib/fileParser';
 
-export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) => {
+export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUpdate }) => {
   // অ্যাপ স্টেটসমূহ (Core App States)
   const [activeView, setActiveView] = useState<'home' | 'builder' | 'dashboard' | 'analysis_preview'>('home');
   const [cvList, setCvList] = useState<CvData[]>([]);
@@ -907,7 +908,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
             </div>
 
             {/* My Saved Resumes section */}
-            {cvList.length > 0 && (
+            {cvList.length > 0 ? (
               <div className="mt-12">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-display font-black text-white text-lg flex items-center gap-2">
@@ -941,6 +942,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                                   if (res.success) {
                                     showToast(isBn ? 'সিভি মুছে ফেলা হয়েছে' : 'CV deleted successfully');
                                     await loadCvs();
+                                    onUpdate?.();
                                   } else {
                                     showToast(res.error || (isBn ? 'মুছে ফেলতে ব্যর্থ' : 'Delete failed'), 'error');
                                   }
@@ -999,6 +1001,20 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                     </Card>
                   ))}
                 </div>
+              </div>
+            ) : (
+              <div className="mt-12 border border-dashed border-white/10 bg-white/[0.01] rounded-3xl p-10 text-center flex flex-col items-center justify-center">
+                <div className="h-12 w-12 rounded-2xl bg-slate-500/10 text-slate-400 border border-slate-500/20 flex items-center justify-center mb-4">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <h4 className="font-bold text-white text-base">
+                  {isBn ? 'কোনো সংরক্ষিত সিভি পাওয়া যায়নি' : 'No Resumes Saved Yet'}
+                </h4>
+                <p className="text-slate-400 text-xs mt-1 max-w-sm mx-auto">
+                  {isBn 
+                    ? 'আপনার কাছে কোনো সংরক্ষিত সিভি নেই। একটি নতুন সিভি তৈরি করুন অথবা বিদ্যমান সিভি আপলোড করে শুরু করুন।' 
+                    : 'Create a new resume or upload an existing one to see it saved here in your dashboard.'}
+                </p>
               </div>
             )}
           </motion.div>

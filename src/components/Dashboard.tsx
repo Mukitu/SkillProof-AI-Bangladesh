@@ -170,27 +170,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     loadDashboardData();
   }, [user, activeTab]);
 
-  // নোটিফিকেশন মক ডাটা (Mock Notification Data)
-  const notifications = [
-    {
-      id: '1',
-      titleBn: 'নতুন এআই ভাইভা উপলব্ধ!',
-      titleEn: 'New AI Interview available!',
-      descBn: 'আপনার প্রোফাইলের ওপর ভিত্তি করে ভাইভা কাস্টমাইজ করা হয়েছে।',
-      descEn: 'Based on your profile, viva questions have been customized.',
-      time: '৫ মিনিট আগে'
-    }
-  ];
+  // ডাইনামিক নোটিফিকেশন জেনারেট করা (Build dynamic notification list based on actual user activity logs)
+  const notifications = dynamicActivities.map((act) => ({
+    id: act.id,
+    titleBn: act.titleBn,
+    titleEn: act.titleEn,
+    descBn: act.detailBn,
+    descEn: act.detailEn,
+    time: act.time
+  }));
+
+  if (notifications.length === 0) {
+    notifications.push({
+      id: 'welcome',
+      titleBn: 'স্বাগতম SkillProof AI তে!',
+      titleEn: 'Welcome to SkillProof AI!',
+      descBn: 'আপনার প্রথম এআই সিভি আপলোড করে অথবা ভাইভাতে অংশগ্রহণ করে স্কিল পাসপোর্ট তৈরি করুন।',
+      descEn: 'Upload your first CV or take an interactive interview to prepare your skill passport.',
+      time: 'Just now'
+    });
+  }
 
   // মেনু অপশনসমূহ (Sidebar Menu Definitions)
-  const sidebarMenu = [
+  const sidebarMenu: { id: string; labelBn: string; labelEn: string; icon: any; comingSoon?: boolean; }[] = [
     { id: 'dashboard', labelBn: 'ড্যাশবোর্ড হোম', labelEn: 'Dashboard Home', icon: LayoutDashboard },
     { id: 'cv', labelBn: 'এআই সিভি এডিটর', labelEn: 'AI Smart CV', icon: FileText },
     { id: 'interview', labelBn: 'এআই ভাইভা', labelEn: 'AI Interview', icon: Video },
     { id: 'passport', labelBn: 'স্কিল পাসপোর্ট', labelEn: 'Skill Passport', icon: Award },
     { id: 'growth', labelBn: 'ক্যারিয়ার গ্রোথ হাব', labelEn: 'Career Growth Hub', icon: TrendingUp },
-    { id: 'roadmap', labelBn: 'ক্যারিয়ার রোডম্যাপ', labelEn: 'Career Roadmap', icon: Map, comingSoon: true },
-    { id: 'progress', labelBn: 'অগ্রগতি ট্র্যাকার', labelEn: 'Progress Tracker', icon: BarChart3, comingSoon: true },
+    { id: 'roadmap', labelBn: 'ক্যারিয়ার রোডম্যাপ', labelEn: 'Career Roadmap', icon: Map },
+    { id: 'progress', labelBn: 'অগ্রগতি ট্র্যাকার', labelEn: 'Progress Tracker', icon: BarChart3 },
     { id: 'reports', labelBn: 'এআই রিপোর্ট ও এক্সপোর্ট', labelEn: 'AI Reports & Export', icon: Download },
     { id: 'profile', labelBn: 'আমার প্রোফাইল', labelEn: 'My Profile', icon: User },
     { id: 'settings', labelBn: 'সেটিংস ও নিরাপত্তা', labelEn: 'Settings & Security', icon: Settings },
@@ -245,17 +254,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100 transition-colors duration-300">
+    <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
       {/* ১. লেফট সাইডবার (Left Sidebar Component) */}
-      <aside className="hidden lg:flex flex-col w-64 border-r border-white/5 bg-[#090909] px-4 py-6 shrink-0 relative z-20">
+      <aside className="hidden lg:flex flex-col w-64 border-r border-slate-200 dark:border-white/5 bg-white dark:bg-[#090909] px-4 py-6 shrink-0 relative z-20">
         {/* Brand/Logo */}
         <div className="flex items-center gap-3 px-2 mb-8">
           <div className="h-10 w-10 rounded-xl bg-emerald-500 flex items-center justify-center font-display font-black text-slate-950 text-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] shrink-0">
             SP
           </div>
           <div>
-            <h1 className="text-sm font-bold tracking-tight text-white leading-tight">SkillProof AI</h1>
+            <h1 className="text-sm font-bold tracking-tight text-slate-900 dark:text-white leading-tight">SkillProof AI</h1>
             <p className="text-[9px] uppercase tracking-widest text-emerald-500 font-bold">Bangladesh</p>
           </div>
         </div>
@@ -271,12 +280,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                 onClick={() => setActiveTab(item.id)}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-medium transition-all group ${
                   isActive 
-                    ? 'bg-white/5 text-emerald-400 border border-white/10 shadow-sm' 
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    ? 'bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-400 border border-emerald-100/50 dark:border-white/10 shadow-sm' 
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5'
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-brand-green' : 'text-slate-400 group-hover:text-slate-200'}`} />
+                  <Icon className={`w-4 h-4 transition-colors ${isActive ? 'text-emerald-500' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'}`} />
                   <span>{isBn ? item.labelBn : item.labelEn}</span>
                 </div>
                 {item.comingSoon && (
@@ -290,7 +299,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
         </nav>
 
         {/* Sidebar Footer / User Card */}
-        <div className="pt-4 border-t border-slate-100 dark:border-slate-900 flex flex-col gap-3">
+        <div className="pt-4 border-t border-slate-200 dark:border-slate-900 flex flex-col gap-3">
           <div className="flex items-center gap-3 px-2">
             <img 
               src={user?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80'} 
@@ -299,8 +308,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
               referrerPolicy="no-referrer"
             />
             <div className="overflow-hidden">
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate leading-tight">{user?.fullName}</h4>
-              <span className="text-[10px] text-slate-400 truncate block mt-0.5">{user?.email}</span>
+              <h4 className="text-xs font-bold text-slate-800 dark:text-white truncate leading-tight">{user?.fullName}</h4>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block mt-0.5">{user?.email}</span>
             </div>
           </div>
           <button 
@@ -314,10 +323,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
       </aside>
 
       {/* ২. মেইন কন্টেন্ট এরিয়া (Main Content Area with top navbar) */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-slate-50 dark:bg-slate-950">
         
         {/* টপ নেভিগেশন বার (Top Navbar Component) */}
-        <header className="sticky top-0 z-30 bg-[#050505]/80 backdrop-blur-md border-b border-white/5 px-6 py-4 flex items-center justify-between">
+        <header className="sticky top-0 z-30 bg-white/80 dark:bg-[#050505]/80 backdrop-blur-md border-b border-slate-200 dark:border-white/5 px-6 py-4 flex items-center justify-between">
           
           {/* Left: Hamburger menu for small screens & Search Box */}
           <div className="flex items-center gap-4 flex-1">
@@ -333,7 +342,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                 placeholder={isBn ? 'অনুসন্ধান করুন...' : 'Search...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#111111] border border-white/10 rounded-full pl-10 pr-4 py-1.5 text-xs focus:outline-none focus:border-emerald-500/50 text-slate-200"
+                className="w-full bg-slate-100 dark:bg-[#111111] border border-slate-200 dark:border-white/10 rounded-full pl-10 pr-4 py-1.5 text-xs focus:outline-none focus:border-emerald-500/50 text-slate-800 dark:text-slate-200"
               />
             </div>
           </div>
@@ -361,18 +370,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 mt-2.5 w-80 glass-panel border border-white/10 text-white rounded-2xl shadow-2xl p-4 overflow-hidden z-50"
+                    className="absolute right-0 mt-2.5 w-80 bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/10 text-slate-900 dark:text-white rounded-2xl shadow-2xl p-4 overflow-hidden z-50"
                   >
-                    <div className="flex justify-between items-center pb-2 border-b border-white/10 mb-2">
-                      <h5 className="font-bold text-xs">{isBn ? 'নোটিফিকেশনসমূহ' : 'Notifications'}</h5>
-                      <span className="text-[10px] text-brand-green font-semibold">২টি নতুন</span>
+                    <div className="flex justify-between items-center pb-2 border-b border-slate-100 dark:border-white/10 mb-2">
+                      <h5 className="font-bold text-xs text-slate-800 dark:text-white">{isBn ? 'নোটিফিকেশনসমূহ' : 'Notifications'}</h5>
+                      <span className="text-[10px] text-brand-green font-semibold">
+                        {isBn 
+                          ? `${notifications.filter(n => n.id !== 'welcome').length}টি নতুন` 
+                          : `${notifications.filter(n => n.id !== 'welcome').length} New`}
+                      </span>
                     </div>
                     <div className="flex flex-col gap-2 max-h-60 overflow-y-auto">
                       {notifications.map((n) => (
-                        <div key={n.id} className="p-2 hover:bg-white/5 rounded-xl transition-all flex flex-col gap-0.5">
-                          <span className="text-xs font-bold text-slate-100">{isBn ? n.titleBn : n.titleEn}</span>
-                          <span className="text-[10px] text-slate-400 leading-normal">{isBn ? n.descBn : n.descEn}</span>
-                          <span className="text-[8px] text-slate-500 mt-1">{n.time}</span>
+                        <div key={n.id} className="p-2 hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all flex flex-col gap-0.5">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-100">{isBn ? n.titleBn : n.titleEn}</span>
+                          <span className="text-[10px] text-slate-500 dark:text-slate-400 leading-normal">{isBn ? n.descBn : n.descEn}</span>
+                          <span className="text-[8px] text-slate-400 dark:text-slate-500 mt-1">{n.time}</span>
                         </div>
                       ))}
                     </div>
@@ -468,104 +481,104 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                       
                       {/* CV Feature card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
                               <Code2 className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featCvTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featCvDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featCvTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featCvDesc')}</p>
                         </div>
                       </Card>
 
                       {/* AI Interview card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-cyan-500/30 dark:hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-500 flex items-center justify-center">
                               <Video className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featInterviewTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featInterviewDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featInterviewTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featInterviewDesc')}</p>
                         </div>
                       </Card>
 
                       {/* Adaptive Viva card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-purple-500/30 dark:hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-500 flex items-center justify-center">
                               <Cpu className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featAdaptiveTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featAdaptiveDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featAdaptiveTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featAdaptiveDesc')}</p>
                         </div>
                       </Card>
 
                       {/* Skill Passport card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-emerald-500/30 dark:hover:border-emerald-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-emerald-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-500 flex items-center justify-center">
                               <Award className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featPassportTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featPassportDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featPassportTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featPassportDesc')}</p>
                         </div>
                       </Card>
 
                       {/* Roadmap card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-cyan-500/30 dark:hover:border-cyan-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-cyan-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-500 flex items-center justify-center">
                               <Map className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featRoadmapTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featRoadmapDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featRoadmapTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featRoadmapDesc')}</p>
                         </div>
                       </Card>
 
                       {/* Progress card */}
-                      <Card hoverEffect={false} className="flex flex-col justify-between border border-white/5 bg-[#0c0c0c] hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
+                      <Card hoverEffect={false} className="flex flex-col justify-between border border-slate-200 dark:border-white/5 bg-white dark:bg-[#0c0c0c] hover:border-purple-500/30 dark:hover:border-purple-500/30 relative group overflow-hidden rounded-3xl p-6 transition-all duration-300">
                         <div className="absolute -right-8 -top-8 w-32 h-32 bg-purple-500/5 blur-3xl rounded-full pointer-events-none" />
                         <div>
                           <div className="flex justify-between items-start mb-4">
-                            <div className="h-12 h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                            <div className="h-12 w-12 rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-500 flex items-center justify-center">
                               <BarChart3 className="w-6 h-6" />
                             </div>
-                            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
+                            <span className="px-2 py-0.5 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded text-[9px] uppercase font-bold tracking-widest text-slate-500">
                               {t('comingSoon')}
                             </span>
                           </div>
-                          <h4 className="font-display font-bold text-white text-base">{t('featProgressTitle')}</h4>
-                          <p className="text-xs text-slate-400 mt-2 leading-relaxed">{t('featProgressDesc')}</p>
+                          <h4 className="font-display font-bold text-slate-900 dark:text-white text-base">{t('featProgressTitle')}</h4>
+                          <p className="text-xs text-slate-600 dark:text-slate-400 mt-2 leading-relaxed">{t('featProgressDesc')}</p>
                         </div>
                       </Card>
 
@@ -634,6 +647,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   userId={user?.id || 'demo_user_id'} 
                   isBn={isBn} 
                   onBack={() => setActiveTab('dashboard')} 
+                  onUpdate={() => loadDashboardData()}
                 />
               )}
 
@@ -643,10 +657,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   userId={user?.id || 'demo_user_id'} 
                   isBn={isBn} 
                   onBack={() => setActiveTab('dashboard')} 
+                  onUpdate={() => loadDashboardData()}
                 />
               )}
 
-              {/* TAB 4: AI SKILL PASSPORT (এআই স্কিল পাসপোর্ট) */}
+              {/* TAB 4: SKILL PASSPORT (এআই স্কিল পাসপোর্ট) */}
               {activeTab === 'passport' && (
                 <AiSkillPassport 
                   onBack={() => setActiveTab('dashboard')} 
@@ -660,28 +675,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                 />
               )}
 
-              {/* TAB 2-7: FEATURE PLACEHOLDERS REDIRECTED TO THE DASHBOARD PAGE VIEW */}
-              {['roadmap', 'progress'].includes(activeTab) && (
-                <div className="max-w-4xl mx-auto py-12 flex flex-col gap-6">
-                  <PageHeader 
-                    title={isBn ? `${sidebarMenu.find(m => m.id === activeTab)?.labelBn} - ফিচার মডিউল` : `${sidebarMenu.find(m => m.id === activeTab)?.labelEn} Feature Module`}
-                    description={isBn ? 'এই মডিউলটি পরবর্তী ধাপে এআই ইন্টিগ্রেশন এর মাধ্যমে উন্মুক্ত করা হবে।' : 'This module will be fully integrated with AI models in the subsequent phase.'}
-                  />
-                  <Card className="flex flex-col items-center justify-center text-center p-12 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-xl">
-                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-tr from-brand-green/15 to-brand-blue/15 text-brand-green flex items-center justify-center mb-6">
-                      <Sparkles className="w-8 h-8 animate-pulse" />
-                    </div>
-                    <h3 className="text-xl font-bold font-display text-slate-900 dark:text-white mb-2">
-                      {isBn ? 'এআই ফিচার ইন্টিগ্রেশন লোড হচ্ছে...' : 'AI Feature Integration Pending'}
-                    </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md leading-relaxed mb-6">
-                      {isBn 
-                        ? 'এটি চমৎকার একটি ফিচার ভিত্তিপ্রস্তর। পরবর্তী প্রম্পটসমূহে আমরা সম্পূর্ণ এআই সিভি এডিটিং সেশন, ভাইভা এবং ক্যারিয়ার স্কিল রিয়েল-টাইম ইন্টিগ্রেট করবো।' 
-                        : 'This page represents a stunning layout foundation. In the upcoming prompts, we will hook up real-time live AI models to evaluate your skills.'}
-                    </p>
-                    <Badge variant="brand">{t('comingSoon')}</Badge>
-                  </Card>
-                </div>
+              {/* TAB 6: AI LEARNING ROADMAP (ক্যারিয়ার রোডম্যাপ) */}
+              {activeTab === 'roadmap' && (
+                <AiCareerGrowth 
+                  onNavigateToTab={(tabId) => setActiveTab(tabId)} 
+                  initialFocusSection="roadmap"
+                />
+              )}
+
+              {/* TAB 7: AI PROGRESS TRACKER (অগ্রগতি ট্র্যাকার) */}
+              {activeTab === 'progress' && (
+                <AiCareerGrowth 
+                  onNavigateToTab={(tabId) => setActiveTab(tabId)} 
+                  initialFocusSection="progress"
+                />
               )}
 
               {/* TAB 8: AI REPORTS & EXPORT (এআই রিপোর্ট ও এক্সপোর্ট) */}

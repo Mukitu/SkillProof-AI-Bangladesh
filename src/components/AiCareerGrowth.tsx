@@ -40,12 +40,28 @@ const ICON_MAP: Record<string, React.FC<any>> = {
 
 interface AiCareerGrowthProps {
   onNavigateToTab: (tabId: string) => void;
+  initialFocusSection?: 'growth' | 'roadmap' | 'progress';
 }
 
-export const AiCareerGrowth: React.FC<AiCareerGrowthProps> = ({ onNavigateToTab }) => {
+export const AiCareerGrowth: React.FC<AiCareerGrowthProps> = ({ onNavigateToTab, initialFocusSection }) => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const isEn = language === 'en';
+
+  useEffect(() => {
+    if (initialFocusSection) {
+      const elementId = initialFocusSection === 'roadmap' ? 'section-learning-roadmap' : 
+                        initialFocusSection === 'progress' ? 'section-skill-analytics' : null;
+      if (elementId) {
+        setTimeout(() => {
+          const el = document.getElementById(elementId);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 300);
+      }
+    }
+  }, [initialFocusSection]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [syncing, setSyncing] = useState<boolean>(false);

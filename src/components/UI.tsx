@@ -32,11 +32,11 @@ export const Button: React.FC<ButtonProps> = ({
   const baseStyle = "relative inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 active:scale-98 disabled:opacity-50 disabled:pointer-events-none";
   
   const variants = {
-    primary: "bg-emerald-500 text-slate-950 hover:bg-emerald-400 focus:ring-emerald-500 font-bold shadow-[0_0_15px_rgba(16,185,129,0.3)]",
-    secondary: "bg-cyan-500 text-slate-950 hover:bg-cyan-400 focus:ring-cyan-500 font-bold shadow-[0_0_15px_rgba(6,180,210,0.3)]",
-    outline: "border border-white/10 text-slate-300 hover:text-white hover:bg-white/5 focus:ring-slate-500",
+    primary: "bg-emerald-600 dark:bg-emerald-500 text-white dark:text-slate-950 hover:bg-emerald-500 dark:hover:bg-emerald-400 focus:ring-emerald-500 font-bold shadow-sm dark:shadow-[0_0_15px_rgba(16,185,129,0.3)]",
+    secondary: "bg-cyan-600 dark:bg-cyan-500 text-white dark:text-slate-950 hover:bg-cyan-500 dark:hover:bg-cyan-400 focus:ring-cyan-500 font-bold shadow-sm dark:shadow-[0_0_15px_rgba(6,180,210,0.3)]",
+    outline: "border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:text-slate-900 hover:bg-slate-50 dark:hover:text-white dark:hover:bg-white/5 focus:ring-slate-500",
     danger: "bg-red-600 text-white hover:bg-red-700 focus:ring-red-500",
-    glass: "glass-panel text-slate-200 hover:text-white hover:bg-white/10 border-white/10"
+    glass: "glass-panel text-slate-800 dark:text-slate-200 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/10 border-slate-200 dark:border-white/10"
   };
 
   const sizes = {
@@ -75,13 +75,13 @@ export const Card: React.FC<CardProps> = ({
   const baseStyle = "rounded-2xl p-6 overflow-hidden transition-all duration-300";
   
   const variants = {
-    default: "bg-[#0c0c0c] border border-white/5 shadow-xl shadow-black/45 text-white",
-    glass: "glass-panel text-white",
-    outline: "border border-white/10 bg-transparent text-white"
+    default: "bg-white dark:bg-[#0c0c0c] border border-slate-200 dark:border-white/5 shadow-sm dark:shadow-xl dark:shadow-black/45 text-slate-900 dark:text-white",
+    glass: "glass-panel text-slate-900 dark:text-white",
+    outline: "border border-slate-200 dark:border-white/10 bg-transparent text-slate-900 dark:text-white"
   };
 
   const hoverStyle = hoverEffect 
-    ? "hover:translate-y-[-4px] hover:shadow-2xl hover:border-white/15" 
+    ? "hover:translate-y-[-4px] hover:shadow-md dark:hover:shadow-2xl hover:border-slate-300 dark:hover:border-white/15" 
     : "";
 
   return (
@@ -174,14 +174,14 @@ export const Modal: React.FC<ModalProps> = ({
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 15 }}
           transition={{ type: "spring", duration: 0.4 }}
-          className={`relative w-full ${sizeClasses[size]} glass-panel text-white rounded-2xl overflow-hidden shadow-2xl border border-white/10 z-10`}
+          className={`relative w-full ${sizeClasses[size]} bg-white dark:bg-[#0c0c0c] text-slate-900 dark:text-white rounded-2xl overflow-hidden shadow-2xl border border-slate-200 dark:border-white/10 z-10`}
         >
           {/* Header */}
-          <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-            <h3 className="font-display font-semibold text-lg text-white">{title}</h3>
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
+            <h3 className="font-display font-semibold text-lg text-slate-900 dark:text-white">{title}</h3>
             <button 
               onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
             >
               <XCircle className="w-5 h-5" />
             </button>
@@ -223,7 +223,7 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 }) => {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
-      <div className="flex flex-col gap-4 text-slate-300 text-sm">
+      <div className="flex flex-col gap-4 text-slate-600 dark:text-slate-300 text-sm">
         <div className="flex items-start gap-3">
           <AlertTriangle className={`w-5 h-5 shrink-0 ${isDanger ? 'text-red-500' : 'text-amber-500'}`} />
           <p>{message}</p>
@@ -436,10 +436,10 @@ export const LanguageSwitch: React.FC = () => {
 // THEME SWITCHER (ডার্ক/লাইট মোড পরিবর্তনকারী)
 // ==========================================
 export const ThemeSwitch: React.FC = () => {
-  const [theme, setThemeState] = React.useState<'light' | 'dark'>('dark');
+  const [theme, setThemeState] = React.useState<'light' | 'dark'>('light');
 
   React.useEffect(() => {
-    const savedTheme = localStorage.getItem('skillproof_theme') || 'dark';
+    const savedTheme = localStorage.getItem('skillproof_theme') || 'light';
     setThemeState(savedTheme as 'light' | 'dark');
     if (savedTheme === 'dark') {
       document.documentElement.classList.add('dark');

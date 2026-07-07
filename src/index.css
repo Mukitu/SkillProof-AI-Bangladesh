@@ -1,30 +1,17 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Hind+Siliguri:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Inter", "Hind Siliguri", "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Hind Siliguri", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  /* Sophisticated Dark Theme Color Accents */
+  /* Sophisticated Theme Color Accents */
   --color-brand-green: #10b981;
   --color-brand-blue: #06b6d4;
   --color-brand-purple: #8b5cf6;
   --color-glass-dark: rgba(9, 9, 9, 0.85);
   --color-glass-light: rgba(255, 255, 255, 0.05);
-
-  /* Remapping all slate colors to the precise hex values of the "Sophisticated Dark" Design */
-  --color-slate-50: #050505;
-  --color-slate-100: #111111;
-  --color-slate-200: #1e1e1e;
-  --color-slate-300: #2d2d2d;
-  --color-slate-400: #94a3b8;
-  --color-slate-500: #64748b;
-  --color-slate-600: #475569;
-  --color-slate-700: #334155;
-  --color-slate-800: #0c0c0c;
-  --color-slate-900: #090909;
-  --color-slate-950: #050505;
 
   /* Animation Utilities */
   --animate-shimmer: shimmer 2s infinite linear;
@@ -40,62 +27,82 @@
   }
 }
 
-/* Base Body Styles for Sophisticated Dark theme */
+/* Base Body Styles */
 html, body {
-  background-color: #050505 !important;
-  color: #f1f5f9 !important;
+  background-color: #ffffff;
+  color: #0f172a;
   font-family: var(--font-sans);
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Force dark mode background on any container using slate-50 or bg-white in light/dark transitions */
-.bg-white, .bg-slate-50 {
-  background-color: #050505 !important;
-}
-
-.text-slate-800, .text-slate-900 {
-  color: #f1f5f9 !important;
+html.dark, html.dark body {
+  background-color: #050505;
+  color: #f8fafc;
 }
 
 /* Premium Card & Glass Panel Styling */
 .glass-panel {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+}
+
+html.dark .glass-panel {
   background: rgba(12, 12, 12, 0.85) !important;
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 .glass-panel-light {
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(15, 23, 42, 0.06) !important;
+}
+
+html.dark .glass-panel-light {
   background: rgba(255, 255, 255, 0.04) !important;
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.06) !important;
 }
 
 /* Precise Mockup Shadows and Glow Effects */
 .glow-green, .glow-emerald {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.15);
+}
+html.dark .glow-green, html.dark .glow-emerald {
   box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
 }
 
 .glow-cyan {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+}
+html.dark .glow-cyan {
   box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
 }
 
 .glow-purple {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.15);
+}
+html.dark .glow-purple {
   box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);
 }
 
 /* Hover effects matching bento cards exactly */
 .hover-card-emerald:hover {
-  border-color: rgba(16, 185, 129, 0.3) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
 }
 
 .hover-card-cyan:hover {
-  border-color: rgba(6, 182, 212, 0.3) !important;
+  border-color: rgba(6, 182, 212, 0.4) !important;
 }
 
 .hover-card-purple:hover {
-  border-color: rgba(139, 92, 246, 0.3) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
 }
 
 /* Custom Scrollbars in Sophisticated Style */
@@ -104,18 +111,35 @@ html, body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #050505;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.15);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.3);
+}
+
+html.dark ::-webkit-scrollbar-track {
+  background: #050505;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.25);
 }
 
 /* Inputs, Textareas, and Select Fields Overrides */
 input[type="text"], input[type="email"], input[type="password"], textarea, select {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  color: #0f172a !important;
+  border-radius: 0.5rem;
+}
+
+html.dark input[type="text"], html.dark input[type="email"], html.dark input[type="password"], html.dark textarea, html.dark select {
   background-color: #111111 !important;
   border-color: rgba(255, 255, 255, 0.1) !important;
   color: #ffffff !important;
@@ -124,6 +148,7 @@ input[type="text"], input[type="email"], input[type="password"], textarea, selec
 input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus, textarea:focus, select:focus {
   border-color: rgba(16, 185, 129, 0.5) !important;
   outline: none !important;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
 }
 
 .technical-label {
@@ -188,7 +213,6 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 
 /* Print Stylesheet */
 @media print {
-  /* Hide all elements on the page except the resume container */
   body, html {
     background: #ffffff !important;
   }
@@ -220,4 +244,3 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     margin: 0;
   }
 }
-

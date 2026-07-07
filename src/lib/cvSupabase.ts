@@ -30,6 +30,7 @@ if (supabaseUrl && supabaseAnonKey && supabaseUrl !== 'YOUR_SUPABASE_URL') {
 const CV_STORAGE_KEY = 'skillproof_cv_data_list';
 const HISTORY_STORAGE_KEY = 'skillproof_cv_history_list';
 const FILES_STORAGE_KEY = 'skillproof_cv_files_metadata';
+const INTERVIEW_STORAGE_KEY = 'skillproof_interview_sessions';
 
 // ====================================================================
 // সুপাবেজ ডাটাবেজ এবং স্টোরেজ সার্ভিস (Supabase Database & Storage Service)
@@ -164,6 +165,60 @@ export const cvDb = {
   // ৫. সিভি মুছে ফেলা (Delete CV from database)
   deleteResume: async (id: string, userId: string): Promise<{ success: boolean; error: string | null }> => {
     if (isRealSupabase) {
+      // ১. Storage থেকে ফাইল মুছে ফেলা (Delete PDF from Supabase Storage)
+      try {
+        const { data: files } = await supabaseClient
+          .from('cv_files_metadata')
+          .select('*')
+          .eq('userId', userId);
+        
+        if (files && files.length > 0) {
+          const filePaths = files.map((f: any) => {
+            const urlParts = f.fileUrl.split('/');
+            const cleanName = urlParts[urlParts.length - 1];
+            return `${userId}/${cleanName}`;
+          });
+
+          if (filePaths.length > 0) {
+            await supabaseClient.storage.from('cv_storage').remove(filePaths);
+          }
+        }
+      } catch (err) {
+        console.warn('⚠️ Supabase Storage PDF deletion warning:', err);
+      }
+
+      // ২. মেটাডাটা টেবিল থেকে ডিলিট করা
+      try {
+        await supabaseClient
+          .from('cv_files_metadata')
+          .delete()
+          .eq('userId', userId);
+      } catch (err) {
+        console.warn('⚠️ cv_files_metadata deletion warning:', err);
+      }
+
+      // ৩. অ্যাসোসিয়েটেড ইন্টারভিউ সেশন মুছে ফেলা (Delete interview sessions for this CV)
+      try {
+        await supabaseClient
+          .from('interview_sessions')
+          .delete()
+          .eq('cvId', id)
+          .eq('userId', userId);
+      } catch (err) {
+        console.warn('⚠️ interview_sessions deletion warning:', err);
+      }
+
+      // ৪. ইম্প্রুভমেন্ট হিস্ট্রি মুছে ফেলা (Delete improvement history)
+      try {
+        await supabaseClient
+          .from('cv_improvement_history')
+          .delete()
+          .eq('cvId', id);
+      } catch (err) {
+        console.warn('⚠️ cv_improvement_history deletion warning:', err);
+      }
+
+      // ৫. সিভি রেকর্ড ডাটাবেজ থেকে মুছে ফেলা (Delete resume from cv_resumes)
       try {
         const { error } = await supabaseClient
           .from('cv_resumes')
@@ -171,19 +226,45 @@ export const cvDb = {
           .eq('id', id)
           .eq('userId', userId);
 
-        if (error) throw error;
-        return { success: true, error: null };
+        if (error) {
+          console.error('❌ Core cv_resumes deletion error:', error);
+          return { success: false, error: error.message };
+        }
       } catch (err: any) {
-        console.warn('⚠️ Delete operation failed, using local state:', err);
+        console.error('❌ Core cv_resumes deletion exception:', err);
+        return { success: false, error: err.message || 'Unknown database error' };
       }
     }
 
+    // লোকালস্টোরেজ / ক্যাশ ডাটা ক্লিন করা (Clear cached / localStorage data)
     const stored = localStorage.getItem(CV_STORAGE_KEY);
     if (stored) {
       let list: CvData[] = JSON.parse(stored);
       list = list.filter(cv => cv.id !== id);
       localStorage.setItem(CV_STORAGE_KEY, JSON.stringify(list));
     }
+
+    const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (storedHistory) {
+      let list = JSON.parse(storedHistory);
+      list = list.filter((h: any) => h.cvId !== id);
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(list));
+    }
+
+    const storedMeta = localStorage.getItem(FILES_STORAGE_KEY);
+    if (storedMeta) {
+      let list = JSON.parse(storedMeta);
+      list = list.filter((m: any) => m.userId !== userId);
+      localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(list));
+    }
+
+    const storedSessions = localStorage.getItem(INTERVIEW_STORAGE_KEY);
+    if (storedSessions) {
+      let list = JSON.parse(storedSessions);
+      list = list.filter((s: any) => s.cvId !== id);
+      localStorage.setItem(INTERVIEW_STORAGE_KEY, JSON.stringify(list));
+    }
+
     return { success: true, error: null };
   },
 

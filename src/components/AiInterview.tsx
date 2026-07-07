@@ -77,10 +77,119 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
   const [adaptiveMemory, setAdaptiveMemory] = useState<InterviewMemory | null>(null);
   const [isMemoryLoading, setIsMemoryLoading] = useState(false);
 
+  // ভয়েস স্পিড ও কাস্টম কন্ট্রোল স্টেট (Voice settings and Controls state)
+  const [speechRate, setSpeechRate] = useState<number>(0.85); // Reduced default rate for natural, human-like voice speaking pace
+  const [isSpeechPaused, setIsSpeechPaused] = useState<boolean>(false);
+  const [recordingSeconds, setRecordingSeconds] = useState<number>(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [displayedQuestion, setDisplayedQuestion] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // লোকাল টোস্ট নোটিফিকেশন সিস্টেম (Local Toast Notification System)
+  const showLocalToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
   // রিফ রেফারেন্সসমূহ (Refs)
   const recognitionRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const textEndRef = useRef<HTMLDivElement | null>(null);
+
+  // ১. ডাইনামিক টাইপিং এনিমেশন ইফেক্ট (Dynamic Question Typing Animation Effect)
+  useEffect(() => {
+    if (currentQuestion) {
+      setDisplayedQuestion('');
+      let i = 0;
+      const interval = setInterval(() => {
+        setDisplayedQuestion(currentQuestion.slice(0, i + 1));
+        i++;
+        if (i >= currentQuestion.length) {
+          clearInterval(interval);
+        }
+      }, 15);
+      return () => clearInterval(interval);
+    }
+  }, [currentQuestion]);
+
+  // ২. ভয়েস রেকর্ডিং টাইমার ইফেক্ট (Voice Recording Timer Effect)
+  useEffect(() => {
+    if (isRecording) {
+      setRecordingSeconds(0);
+      const interval = setInterval(() => {
+        setRecordingSeconds(prev => prev + 1);
+      }, 1000);
+      recordingTimerRef.current = interval;
+    } else {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+    }
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    };
+  }, [isRecording]);
+
+  // ৩. ড্রাফট আনসার এবং সেশন অটো-রিস্টোর ইফেক্ট (Draft Answer and Session Auto-Restore on Mount)
+  useEffect(() => {
+    const restoreActiveSession = async () => {
+      if (!userId) return;
+      const activeId = localStorage.getItem('skillproof_active_session_id');
+      if (activeId) {
+        try {
+          const restored = await interviewDb.getSessionById(activeId, userId);
+          if (restored && restored.status === 'in_progress') {
+            setSession(restored);
+            const lastQaIndex = restored.qa.length - 1;
+            const currentQa = restored.qa[lastQaIndex];
+            
+            setCurrentQuestionIndex(lastQaIndex);
+            setCurrentQuestion(currentQa.question);
+            setDurationSeconds(restored.duration || 0);
+            
+            // ক্যাটাগরি ম্যাপিং
+            if (lastQaIndex === 0) setCurrentCategory('HR');
+            else if (lastQaIndex === 1) setCurrentCategory('Technical');
+            else if (lastQaIndex === 2) setCurrentCategory('Coding/System');
+            else if (lastQaIndex === 3) setCurrentCategory('Behavioral');
+            else setCurrentCategory('Brainteaser');
+            
+            // ড্রাফট উত্তর রিস্টোর করা
+            const draft = localStorage.getItem(`skillproof_answer_draft_${restored.id}`);
+            setAnswerText(draft || currentQa.answer || '');
+            
+            // রানিং এভারেজ ক্যালকুলেশন
+            calculateRunningAverage(restored.qa);
+            
+            // সরাসরি ইন্টারভিউ স্ক্রিনে নিয়ে যাওয়া ও টাইমার চালু করা
+            setStep('interview');
+            setTimerActive(true);
+            timerRef.current = setInterval(() => {
+              setDurationSeconds(prev => prev + 1);
+            }, 1000);
+          } else {
+            localStorage.removeItem('skillproof_active_session_id');
+          }
+        } catch (err) {
+          console.error('Failed to restore previous session:', err);
+        }
+      }
+    };
+    restoreActiveSession();
+  }, [userId]);
+
+  // ৪. রানিং টাইপ করা টেক্সট ড্রাফট আকারে সেভ করা (Save current answer draft locally to survive reload)
+  useEffect(() => {
+    if (session && answerText) {
+      localStorage.setItem(`skillproof_answer_draft_${session.id}`, answerText);
+    }
+  }, [answerText, session]);
 
   // ==========================================
   // ইনিশিয়াল ডাটা লোড (Initial Data Loading)
@@ -290,9 +399,11 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     if (!('speechSynthesis' in window)) return;
     
     stopVoiceSpeaking();
+    setIsSpeechPaused(false);
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
+    utterance.rate = speechRate; // ডাইনামিক স্পিড নির্ধারণ (0.75x, 1x, 1.25x)
     
     // ক্রোম বা সাফারির জন্য ভালো মানের ভয়েস নির্বাচন
     const voices = window.speechSynthesis.getVoices();
@@ -307,16 +418,37 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     }
 
     utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      setIsSpeechPaused(false);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      setIsSpeechPaused(false);
+    };
 
     window.speechSynthesis.speak(utterance);
+  };
+
+  const pauseVoiceSpeaking = () => {
+    if ('speechSynthesis' in window && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+      window.speechSynthesis.pause();
+      setIsSpeechPaused(true);
+    }
+  };
+
+  const resumeVoiceSpeaking = () => {
+    if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setIsSpeechPaused(false);
+    }
   };
 
   const stopVoiceSpeaking = () => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      setIsSpeechPaused(false);
     }
   };
 
@@ -369,6 +501,28 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     rec.onerror = (event: any) => {
       console.error('Speech recognition error:', event.error);
       setIsRecording(false);
+      
+      if (event.error === 'not-allowed') {
+        showLocalToast(
+          isBn ? 'মাইক্রোফোন ব্যবহারের অনুমতি দেওয়া হয়নি। অনুগ্রহ করে ব্রাউজার সেটিংস থেকে অনুমতি দিন।' : 'Microphone access denied! Please allow microphone access in your browser settings.',
+          'error'
+        );
+      } else if (event.error === 'no-speech') {
+        showLocalToast(
+          isBn ? 'কোনো কথা সনাক্ত করা যায়নি। অনুগ্রহ করে আবার বলুন।' : 'No speech detected. Please speak clearly into the microphone.',
+          'info'
+        );
+      } else if (event.error === 'network') {
+        showLocalToast(
+          isBn ? 'নেটওয়ার্ক ত্রুটি! ভয়েস রিকগনিশন সংযোগ বিচ্ছিন্ন হয়েছে।' : 'Network error! Voice recognition server is unreachable.',
+          'error'
+        );
+      } else {
+        showLocalToast(
+          isBn ? `ভয়েস সনাক্তকরণ ত্রুটি: ${event.error}` : `Speech recognition error: ${event.error}`,
+          'error'
+        );
+      }
     };
 
     rec.onend = () => {
@@ -423,6 +577,10 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
         timestamp: new Date().toISOString()
       });
 
+      // সেশন রিস্টোর কী এবং ড্রাফট রিমেডি
+      localStorage.setItem('skillproof_active_session_id', newSession.id);
+      localStorage.removeItem(`skillproof_answer_draft_${newSession.id}`);
+
       setSession(newSession);
       setCurrentQuestion(firstQ);
       setCurrentQuestionIndex(0);
@@ -430,6 +588,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
       setAnswerText('');
       setFeedbackMessage('');
       setAverageScore(0);
+      setSubmitError(null);
       
       // সুপাবেজ ডাটাবেজে সংরক্ষণ করা
       await interviewDb.saveSession(newSession);
@@ -458,6 +617,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     stopRecording();
     stopVoiceSpeaking();
     setIsSubmittingAnswer(true);
+    setSubmitError(null); // ক্লিয়ার পূর্ববর্তী সাবমিশন এরর
 
     try {
       const updatedQa = [...session.qa];
@@ -518,6 +678,10 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
         setSession(finalSession);
         await interviewDb.saveSession(finalSession);
 
+        // সেশন রিস্টোর কি এবং ড্রাফট রিমুভ করা
+        localStorage.removeItem('skillproof_active_session_id');
+        localStorage.removeItem(`skillproof_answer_draft_${session.id}`);
+
         // রিয়েলটাইমে নতুন এডাপ্টিভ মেমোরি জেনারেট করি (Compile new Adaptive memory in real-time)
         try {
           const updatedMemory = await interviewGroq.compileAdaptiveMemory(userId, historySessions, finalSession);
@@ -560,8 +724,9 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
           speakText(res.nextQuestion);
         }, 300);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error submitting answer:', err);
+      setSubmitError(isBn ? 'গ্রক এআই বা নেটওয়ার্ক সংযোগে ত্রুটি হয়েছে! অনুগ্রহ করে আবার চেষ্টা করুন।' : 'Groq AI or Network connection error! Please click retry below to try again.');
     } finally {
       setIsSubmittingAnswer(false);
     }
@@ -1401,78 +1566,170 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
           
           {/* বাম পাশে: এআই অবতার এবং লাইভ প্যারামিটার */}
           <div className="lg:col-span-4 flex flex-col gap-6">
-            <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md text-center py-8">
+            <Card className="border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19] shadow-xl text-center py-8 px-5 relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
               
               {/* এআই অবতার এবং স্পিকিং পালস এনিমেশন */}
-              <div className="relative inline-flex items-center justify-center mb-6">
-                <div className={`absolute h-28 w-28 rounded-full border-4 ${isSpeaking ? 'border-emerald-500/40 scale-110 animate-ping' : 'border-slate-100 dark:border-slate-800'} transition-all`} />
-                <div className={`absolute h-24 w-24 rounded-full border-2 ${isSpeaking ? 'border-emerald-400/60 scale-105 animate-pulse' : 'border-slate-200 dark:border-slate-800/50'} transition-all`} />
+              <div className="relative inline-flex items-center justify-center mb-6 mt-2">
+                <div className={`absolute h-28 w-28 rounded-full border-4 ${isSpeaking ? 'border-emerald-500/40 scale-110 animate-ping' : 'border-slate-100 dark:border-slate-800/80'} transition-all`} />
+                <div className={`absolute h-24 w-24 rounded-full border-2 ${isSpeaking ? 'border-emerald-400/60 scale-105 animate-pulse' : 'border-slate-200/50 dark:border-slate-800/60'} transition-all`} />
                 
-                <div className={`h-20 w-20 rounded-full bg-slate-950 flex items-center justify-center shadow-lg border-2 ${isSpeaking ? 'border-emerald-500 text-emerald-400' : 'border-slate-800 text-slate-400'}`}>
+                <div className={`h-20 w-20 rounded-full bg-slate-900 flex items-center justify-center shadow-lg border-2 ${isSpeaking ? 'border-emerald-500 text-emerald-400' : 'border-slate-700 text-slate-400'}`}>
                   {isSpeaking ? (
-                    <Volume2 className="w-10 h-10 animate-bounce" />
+                    <Volume2 className="w-10 h-10 animate-pulse text-emerald-400" />
                   ) : (
-                    <Video className="w-10 h-10" />
+                    <Video className="w-10 h-10 text-slate-400" />
                   )}
                 </div>
               </div>
 
-              <h4 className="text-base font-black text-slate-900 dark:text-white">
+              <h4 className="text-lg font-black text-slate-900 dark:text-white">
                 {isSpeaking ? (isBn ? 'এআই কথা বলছে...' : 'AI is Speaking...') : (isBn ? 'এআই শুনছে...' : 'AI is Listening...')}
               </h4>
-              <p className="text-xs text-slate-400 mt-1">{isBn ? 'ডাইনামিক এআই ইন্টারভিউয়ার' : 'Dynamic AI Recruiter'}</p>
+              <p className="text-xs text-emerald-500 font-bold tracking-wider uppercase mt-1">{isBn ? 'ডাইনামিক এআই ইন্টারভিউয়ার' : 'Dynamic AI Recruiter'}</p>
 
-              {/* চলমান ভয়েস ওয়েভ এনিমেশন (যখন ইউজার রেকর্ড করছে) */}
-              <div className="h-10 flex items-center justify-center gap-1 mt-6">
+              {/* চলমান ভয়েস ওয়েভ এনিমেশন (যখন ইউজার রেকর্ড করছে বা এআই কথা বলছে) */}
+              <div className="h-12 flex items-center justify-center gap-1.5 mt-6 px-4 bg-slate-50 dark:bg-slate-950/40 rounded-2xl border border-slate-100 dark:border-slate-900">
                 {isRecording ? (
-                  Array.from({ length: 8 }).map((_, i) => (
-                    <motion.div 
-                      key={i}
-                      animate={{ height: [12, 36, 12] }}
-                      transition={{ duration: 0.8 + i * 0.1, repeat: Infinity, ease: 'easeInOut' }}
-                      className="w-1.5 rounded-full bg-emerald-500"
-                    />
-                  ))
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-2 w-2 relative">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span className="text-xs font-mono font-bold text-red-500 dark:text-red-400">
+                      {isBn ? 'ভয়েস রেকর্ড হচ্ছে...' : 'Recording Voice...'} ({recordingSeconds}s)
+                    </span>
+                  </div>
+                ) : isSpeaking ? (
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <motion.div 
+                        key={i}
+                        animate={{ height: [8, 28, 8] }}
+                        transition={{ duration: 0.6 + i * 0.08, repeat: Infinity, ease: 'easeInOut' }}
+                        className="w-1 rounded-full bg-emerald-500"
+                      />
+                    ))}
+                  </div>
                 ) : (
-                  <div className="w-32 h-1 rounded-full bg-slate-200 dark:bg-slate-800" />
+                  <div className="text-xs font-medium text-slate-400 dark:text-slate-500">
+                    {isBn ? 'স্পিচ-টু-টেক্সট রেডি' : 'Speech-to-text ready'}
+                  </div>
                 )}
               </div>
 
+              {/* ভয়েস প্লেব্যাক কন্ট্রোল প্যানেল (কন্ট্রোল এবং স্পিড সেটিংস) */}
+              <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-900 text-left">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider block mb-3">
+                  {isBn ? 'এআই ভয়েস কন্ট্রোল' : 'AI VOICE CONTROLLER'}
+                </span>
+                
+                <div className="flex items-center justify-between gap-2 mb-4 bg-slate-50 dark:bg-slate-950/20 p-2.5 rounded-xl border border-slate-100 dark:border-slate-900">
+                  <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">{isBn ? 'ভয়েস স্পিড:' : 'Speed:'}</span>
+                  <div className="flex gap-1.5">
+                    {[0.75, 0.85, 1.0, 1.25].map((rate) => (
+                      <button
+                        key={rate}
+                        onClick={() => {
+                          setSpeechRate(rate);
+                          if (isSpeaking) {
+                            stopVoiceSpeaking();
+                            setTimeout(() => speakText(currentQuestion), 150);
+                          }
+                        }}
+                        className={`text-[10px] font-black px-2.5 py-1 rounded-lg transition-all ${
+                          speechRate === rate
+                            ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/10'
+                            : 'bg-slate-200/50 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        }`}
+                      >
+                        {rate === 0.85 && !isBn ? 'Natural' : `${rate}x`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  {isSpeaking && !isSpeechPaused ? (
+                    <button
+                      onClick={pauseVoiceSpeaking}
+                      className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 transition-all border border-amber-500/20"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                      {isBn ? 'থামুন' : 'Pause'}
+                    </button>
+                  ) : isSpeechPaused ? (
+                    <button
+                      onClick={resumeVoiceSpeaking}
+                      className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 transition-all border border-emerald-500/20"
+                    >
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      {isBn ? 'চালান' : 'Resume'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => speakText(currentQuestion)}
+                      className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-all border border-slate-200/50 dark:border-slate-800/80"
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      {isBn ? 'শুনুন' : 'Speak'}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={stopVoiceSpeaking}
+                    disabled={!isSpeaking && !isSpeechPaused}
+                    className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl bg-red-500/5 hover:bg-red-500/10 text-red-500 transition-all border border-red-500/10 disabled:opacity-40"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                    {isBn ? 'বন্ধ' : 'Stop'}
+                  </button>
+
+                  <button
+                    onClick={() => speakText(currentQuestion)}
+                    className="flex items-center justify-center gap-1.5 text-xs font-bold py-2 px-3 rounded-xl bg-cyan-500/5 hover:bg-cyan-500/10 text-cyan-500 transition-all border border-cyan-500/10"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    {isBn ? 'রিপ্লে' : 'Replay'}
+                  </button>
+                </div>
+              </div>
+
               {/* রানিং স্কোর মিটার ও প্রগ্রেস */}
-              <div className="grid grid-cols-2 gap-4 mt-8 pt-6 border-t border-slate-100 dark:border-slate-800/80 px-4">
+              <div className="grid grid-cols-2 gap-4 mt-6 pt-5 border-t border-slate-100 dark:border-slate-900 px-1">
                 <div className="text-left">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">
                     {isBn ? 'চলমান প্রশ্ন নম্বর' : 'Question Progress'}
                   </span>
-                  <div className="text-base font-black text-slate-800 dark:text-slate-200 font-mono">
-                    {currentQuestionIndex + 1} / 5
+                  <div className="text-lg font-black text-slate-800 dark:text-white font-mono">
+                    {currentQuestionIndex + 1} <span className="text-xs text-slate-400 dark:text-slate-600">/ 5</span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">
                     {isBn ? 'চলতি ইন্টারভিউ স্কোর' : 'Avg Score'}
                   </span>
-                  <div className="text-base font-black text-emerald-500 font-mono">
+                  <div className="text-lg font-black text-emerald-500 font-mono">
                     {averageScore > 0 ? `${averageScore}%` : '---'}
                   </div>
                 </div>
 
                 <div className="text-left mt-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">
                     {isBn ? 'ইন্টারভিউ টাইম' : 'Time Elapsed'}
                   </span>
-                  <div className="text-sm font-black text-slate-700 dark:text-slate-300 font-mono flex items-center gap-1 justify-start">
+                  <div className="text-sm font-black text-slate-700 dark:text-slate-200 font-mono flex items-center gap-1 justify-start">
                     <Timer className="w-4 h-4 text-cyan-500 shrink-0" />
                     {formatTime(durationSeconds)}
                   </div>
                 </div>
 
                 <div className="text-right mt-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block mb-1">
+                  <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide block mb-1">
                     {isBn ? 'ক্যাটাগরি' : 'Type'}
                   </span>
-                  <Badge variant="info">{currentCategory}</Badge>
+                  <Badge variant="info" className="px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase">{currentCategory}</Badge>
                 </div>
               </div>
             </Card>
@@ -1480,54 +1737,86 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
 
           {/* ডান পাশে: মূল প্রশ্নপত্র, ট্রান্সক্রিপ্ট এবং উত্তর লেখার ক্ষেত্র */}
           <div className="lg:col-span-8 flex flex-col gap-6">
-            <Card className="border-slate-200/50 dark:border-slate-800/40 bg-white dark:bg-[#0c0c0c]/80 shadow-md p-6 sm:p-8 flex-1 flex flex-col justify-between">
-              
+            <Card className="border-slate-200/60 dark:border-slate-800/80 bg-white dark:bg-[#0b0f19] shadow-xl p-6 sm:p-8 flex-1 flex flex-col justify-between relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-slate-100 dark:bg-slate-900">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500"
+                  style={{ width: `${(currentQuestionIndex + 1) * 20}%` }}
+                />
+              </div>
+
               {/* প্রশ্ন ক্ষেত্র */}
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-xs font-extrabold font-mono text-emerald-500 tracking-wider uppercase">
-                    {isBn ? `প্রশ্ন নং ${currentQuestionIndex + 1}` : `Question #${currentQuestionIndex + 1}`}
+                <div className="flex items-center justify-between mb-4 mt-2">
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xs font-black font-mono tracking-wider uppercase">
+                    {isBn ? `প্রশ্ন নং ${currentQuestionIndex + 1} / ৫` : `Question #${currentQuestionIndex + 1} of 5`}
                   </span>
                   
                   <div className="flex gap-2">
                     <button 
-                      onClick={repeatQuestion}
-                      title={isBn ? 'প্রশ্নটি আবার শুনুন' : 'Repeat question audio'}
-                      className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 transition-all border border-slate-200/40 dark:border-slate-800/40"
+                      onClick={() => speakText(currentQuestion)}
+                      title={isBn ? 'প্রশ্নটি আবার শুনুন' : 'Listen/Repeat question audio'}
+                      className="p-2 rounded-xl bg-slate-50 hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800/80 text-slate-400 hover:text-emerald-500 transition-all border border-slate-200/50 dark:border-slate-800/80"
                     >
-                      <Volume2 className="w-4 h-4" />
+                      <Volume2 className="w-4 h-4 text-emerald-500" />
                     </button>
                   </div>
                 </div>
 
-                {/* এআই এর প্রশ্ন টেক্সট */}
-                <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 text-slate-950 dark:text-emerald-100 text-sm sm:text-base font-bold leading-relaxed mb-6 font-sans">
-                  {currentQuestion}
+                {/* এআই এর প্রশ্ন টেক্সট - HIGH CONTRAST READABLE CONTAINER */}
+                <div className="p-6 sm:p-8 rounded-2xl bg-slate-900 border-2 border-emerald-500/40 text-white text-base sm:text-lg lg:text-xl font-bold leading-relaxed mb-6 font-display shadow-xl shadow-emerald-950/40 relative">
+                  <p className="inline">
+                    {displayedQuestion || currentQuestion}
+                  </p>
+                  {displayedQuestion !== currentQuestion && (
+                    <span className="animate-ping inline-block w-2 h-4 bg-emerald-400 ml-1">|</span>
+                  )}
+                  {isSubmittingAnswer && (
+                    <div className="absolute inset-0 bg-white/70 dark:bg-[#0b0f19]/70 flex items-center justify-center backdrop-blur-xs rounded-2xl">
+                      <div className="flex items-center gap-3 bg-slate-900 text-white px-5 py-2.5 rounded-xl border border-slate-700/60 shadow-lg">
+                        <RefreshCw className="w-5 h-5 text-emerald-400 animate-spin" />
+                        <span className="text-xs font-bold font-mono tracking-wider animate-pulse">{isBn ? 'এআই উত্তর মূল্যায়ন করছে...' : 'AI THINKING...'}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* এআই পূর্ববর্তী উত্তরের সংক্ষিপ্ত এনালাইসিস প্রদর্শন করে */}
                 {feedbackMessage && (
-                  <div className="mb-6 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/60 dark:border-slate-800/60 flex items-start gap-2.5">
-                    <Sparkles className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed italic">
-                      <strong className="not-italic text-purple-500 dark:text-purple-400">{isBn ? 'এআই ফিডব্যাক: ' : 'Interviewer Comment: '}</strong>
+                  <div className="mb-6 p-4 rounded-xl bg-purple-500/5 dark:bg-purple-500/5 border border-purple-500/20 flex items-start gap-3">
+                    <Sparkles className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+                    <div className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      <strong className="text-purple-600 dark:text-purple-400 font-bold block mb-0.5">{isBn ? 'এআই ফিডব্যাক' : 'Interviewer Follow-up Comment'}</strong>
                       "{feedbackMessage}"
-                    </p>
+                    </div>
                   </div>
                 )}
               </div>
 
               {/* উত্তর প্রদানের ক্ষেত্র */}
-              <div>
-                <label className="block text-xs font-bold text-slate-400 dark:text-slate-400 mb-2 uppercase tracking-wide">
-                  {isBn ? 'আপনার উত্তর এখানে প্রদান করুন (ইংরেজিতে)' : 'Provide Your Answer (In English)'}
-                </label>
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-wide">
+                    {isBn ? 'আপনার উত্তর প্রদান করুন (ইংরেজিতে)' : 'Your Response (In English)'}
+                  </label>
+                  {answerText && (
+                    <button 
+                      onClick={() => {
+                        setAnswerText('');
+                        localStorage.removeItem(`skillproof_answer_draft_${session.id}`);
+                      }}
+                      className="text-[10px] font-bold text-red-400 hover:text-red-500 transition-all uppercase"
+                    >
+                      {isBn ? 'মুছে ফেলুন' : 'Clear Draft'}
+                    </button>
+                  )}
+                </div>
 
                 {/* যদি ব্রাউজারে স্পিচ সাপোর্ট না করে সতর্কতা */}
                 {!speechSupported && (
-                  <div className="mb-3 text-[10px] text-amber-500 flex items-center gap-1 font-medium">
+                  <div className="mb-3 text-[10px] text-amber-500 flex items-center gap-1 font-medium bg-amber-500/5 p-2 rounded-lg border border-amber-500/10">
                     <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                    {isBn ? 'ভয়েস ইনপুট এই ব্রাউজারে কাজ করছে না। ম্যানুয়ালি টাইপ করুন।' : 'Microphone input is unsupported in your browser. Please type your answers.'}
+                    {isBn ? 'ভয়েস ইনপুট এই ব্রাউজারে কাজ করছে না। ম্যানুয়ালি টাইপ করুন।' : 'Microphone input is unsupported in your browser environment. Please type your answers.'}
                   </div>
                 )}
 
@@ -1536,34 +1825,58 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
                   <textarea 
                     value={answerText}
                     onChange={(e) => setAnswerText(e.target.value)}
-                    placeholder={isBn ? 'স্পিচ-টু-টেক্সট দিয়ে কথা বলুন অথবা সরাসরি এখানে ইংরেজিতে টাইপ করুন...' : 'Speak using the microphone or type your response here in English...'}
-                    className="w-full h-40 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 pr-12 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-900 dark:text-slate-100 transition-all font-medium leading-relaxed resize-none"
+                    placeholder={isBn ? 'মাইক্রোফোন বাটন প্রেস করে উত্তর বলুন অথবা সরাসরি এখানে টাইপ করুন...' : 'Type your answer clearly in English or use the floating microphone button to record...'}
+                    className="w-full h-44 bg-slate-50 dark:bg-slate-950/60 border-2 border-slate-200 dark:border-slate-800/80 rounded-2xl p-4 pr-16 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-slate-900 dark:text-white transition-all font-sans font-medium leading-relaxed resize-none shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-600 disabled:opacity-50"
                     disabled={isSubmittingAnswer}
                   />
 
                   {/* ইন্টারিম ট্রান্সক্রিপ্টিং ওভারলে */}
                   {isRecording && interimTranscript && (
-                    <div className="absolute bottom-4 left-4 right-12 bg-emerald-500/90 text-slate-950 px-3 py-1.5 rounded-lg text-xs font-bold animate-pulse">
-                      🎙️ {interimTranscript}...
+                    <div className="absolute bottom-4 left-4 right-16 bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 px-3 py-2 rounded-xl text-xs font-black animate-pulse shadow-md flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" />
+                      <span>🎙️ {interimTranscript}...</span>
                     </div>
                   )}
 
                   {/* মাইক্রোফোন বাটন টেক্সট এরিয়ার পাশে */}
                   {speechSupported && (
-                    <button 
-                      onClick={toggleRecording}
-                      disabled={isSubmittingAnswer}
-                      className={`absolute right-3 top-3 p-3 rounded-xl transition-all ${
-                        isRecording 
-                          ? 'bg-red-500 text-white animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]' 
-                          : 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-500 border border-slate-200/40 dark:border-slate-800/40'
-                      }`}
-                      title={isRecording ? (isBn ? 'রেকর্ডিং বন্ধ করুন' : 'Stop voice recording') : (isBn ? 'কথা বলা শুরু করুন' : 'Start voice recording')}
-                    >
-                      {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                    </button>
+                    <div className="absolute right-4 top-4 flex flex-col gap-2">
+                      <button 
+                        onClick={toggleRecording}
+                        disabled={isSubmittingAnswer}
+                        className={`p-3.5 rounded-2xl transition-all shadow-lg flex items-center justify-center border-2 ${
+                          isRecording 
+                            ? 'bg-red-500 border-red-400 text-white animate-pulse shadow-[0_0_18px_rgba(239,68,68,0.5)]' 
+                            : 'bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-400 hover:text-emerald-500 border-slate-200 dark:border-slate-800/80 hover:border-emerald-500/50'
+                        }`}
+                        title={isRecording ? (isBn ? 'রেকর্ডিং বন্ধ করুন' : 'Stop voice recording') : (isBn ? 'কথা বলা শুরু করুন' : 'Start voice recording')}
+                      >
+                        {isRecording ? <MicOff className="w-5 h-5 text-white" /> : <Mic className="w-5 h-5 text-emerald-500" />}
+                      </button>
+                    </div>
                   )}
                 </div>
+
+                {/* সাবমিট ত্রুটি নোটিফিকেশন কার্ড */}
+                {submitError && (
+                  <div className="mt-4 p-4 rounded-xl bg-red-500/10 border-2 border-red-500/30 text-slate-100 flex items-start gap-3 justify-between">
+                    <div className="flex items-start gap-2.5">
+                      <ShieldAlert className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-extrabold text-red-500 dark:text-red-400">{isBn ? 'ত্রুটি ঘটেছে' : 'Submission Error'}</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-300 leading-relaxed font-semibold">{submitError}</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={submitAnswer}
+                      className="text-red-400 border-red-500/40 hover:bg-red-500/20 text-[10px] shrink-0 font-bold px-3 py-1.5"
+                    >
+                      {isBn ? 'পুনরায় চেষ্টা করুন' : 'Retry'}
+                    </Button>
+                  </div>
+                )}
 
                 {/* নিচে অ্যাকশন বাটনসমূহ */}
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6">
@@ -1573,7 +1886,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
                       variant="outline" 
                       onClick={skipQuestion}
                       disabled={isSubmittingAnswer}
-                      className="w-full sm:w-auto text-xs font-bold"
+                      className="w-full sm:w-auto text-xs font-bold py-2.5"
                     >
                       {isBn ? 'প্রশ্নটি এড়িয়ে যান' : 'Skip Question'}
                     </Button>
@@ -1585,10 +1898,10 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
                     onClick={submitAnswer}
                     disabled={isSubmittingAnswer || !answerText.trim()}
                     isLoading={isSubmittingAnswer}
-                    className="w-full sm:w-auto font-bold px-8 shadow-xl"
+                    className="w-full sm:w-auto font-black px-8 py-3.5 shadow-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-display hover:scale-[1.02] transition-all"
                   >
                     {isBn ? 'পরবর্তী প্রশ্ন' : 'Submit & Next'}
-                    <Send className="w-4 h-4" />
+                    <Send className="w-4 h-4 ml-1.5" />
                   </Button>
                 </div>
               </div>
@@ -1977,6 +2290,28 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
           </Card>
         </div>
       )}
+
+      {/* LOCAL TOAST NOTIFICATION FLOATING PANEL */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl border backdrop-blur-md max-w-sm"
+            style={{
+              backgroundColor: toast.type === 'error' ? 'rgba(239, 68, 68, 0.15)' : toast.type === 'info' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+              borderColor: toast.type === 'error' ? '#ef4444' : toast.type === 'info' ? '#06b6d4' : '#10b981',
+              color: '#ffffff'
+            }}
+          >
+            <div className={`p-1 rounded-lg ${toast.type === 'error' ? 'bg-red-500/20 text-red-400' : toast.type === 'info' ? 'bg-cyan-500/20 text-cyan-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+              {toast.type === 'error' ? <ShieldAlert className="w-5 h-5" /> : toast.type === 'info' ? <Info className="w-5 h-5" /> : <CheckCircle2 className="w-5 h-5" />}
+            </div>
+            <p className="text-xs font-semibold leading-relaxed text-slate-100">{toast.message}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
