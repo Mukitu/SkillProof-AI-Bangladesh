@@ -25,7 +25,7 @@ if (groqApiKey && groqApiKey !== 'YOUR_GROQ_API_KEY') {
   }
 }
 
-const MODEL_NAME = 'llama-3.1-70b-versatile';
+const MODEL_NAME = 'llama-3.3-70b-versatile';
 
 export const interviewGroq = {
   isConfigured: () => isRealGroq,

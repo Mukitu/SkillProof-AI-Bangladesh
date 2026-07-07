@@ -65,11 +65,14 @@ export const cvDb = {
         }
         return [];
       } catch (err: any) {
-        console.error('⚠️ Database connection failed:', err);
-        throw new Error('Supabase getResumes failed: ' + err.message);
+        console.warn('⚠️ Database connection failed, using local state:', err);
       }
     }
-    throw new Error('Supabase is not configured.');
+
+    // স্যান্ডবক্স ফলব্যাক (Sandbox fallback using localStorage)
+    const stored = localStorage.getItem(CV_STORAGE_KEY);
+    const list: CvData[] = stored ? JSON.parse(stored) : [];
+    return list.filter(cv => cv.userId === userId).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   },
 
   // ৩. সিঙ্গেল সিভি লোড করা (Get single CV by ID)
@@ -98,11 +101,13 @@ export const cvDb = {
         }
         return null;
       } catch (err: any) {
-        console.error('⚠️ Fetch resume by ID error:', err);
-        throw new Error('Supabase getResumeById failed: ' + err.message);
+        console.warn('⚠️ Fetch resume by ID error, using local state:', err);
       }
     }
-    throw new Error('Supabase is not configured.');
+
+    const stored = localStorage.getItem(CV_STORAGE_KEY);
+    const list: CvData[] = stored ? JSON.parse(stored) : [];
+    return list.find(cv => cv.id === id && cv.userId === userId) || null;
   },
 
   // ৪. সিভি সংরক্ষণ বা অটোসেভ (Save or Auto-Save CV to database)
@@ -140,11 +145,20 @@ export const cvDb = {
         if (error) throw error;
         return { success: true, error: null };
       } catch (err: any) {
-        console.error('⚠️ Database save operation failed:', err);
-        return { success: false, error: err.message };
+        console.warn('⚠️ Database save operation failed, using local state:', err);
       }
     }
-    return { success: false, error: 'Supabase is not configured.' };
+
+    const stored = localStorage.getItem(CV_STORAGE_KEY);
+    let list: CvData[] = stored ? JSON.parse(stored) : [];
+    const idx = list.findIndex(item => item.id === cv.id);
+    if (idx > -1) {
+      list[idx] = updatedCv;
+    } else {
+      list.push(updatedCv);
+    }
+    localStorage.setItem(CV_STORAGE_KEY, JSON.stringify(list));
+    return { success: true, error: null };
   },
 
   // ৫. সিভি মুছে ফেলা (Delete CV from database)
@@ -160,11 +174,17 @@ export const cvDb = {
         if (error) throw error;
         return { success: true, error: null };
       } catch (err: any) {
-        console.error('⚠️ Delete operation failed:', err);
-        return { success: false, error: err.message };
+        console.warn('⚠️ Delete operation failed, using local state:', err);
       }
     }
-    return { success: false, error: 'Supabase is not configured.' };
+
+    const stored = localStorage.getItem(CV_STORAGE_KEY);
+    if (stored) {
+      let list: CvData[] = JSON.parse(stored);
+      list = list.filter(cv => cv.id !== id);
+      localStorage.setItem(CV_STORAGE_KEY, JSON.stringify(list));
+    }
+    return { success: true, error: null };
   },
 
   // ৬. ফাইলের মেটাডাটা সংরক্ষণ এবং আপলোড (File Storage & Metadata save)
@@ -247,11 +267,31 @@ export const cvDb = {
           error: null
         };
       } catch (err: any) {
-        console.error('⚠️ Supabase upload failed:', err);
-        return { success: false, url: null, fileName: '', fileSize: 0, error: err.message };
+        console.warn('⚠️ Supabase upload failed, using local state:', err);
       }
     }
-    return { success: false, url: null, fileName: '', fileSize: 0, error: 'Supabase is not configured.' };
+
+    // লোকাল ফলব্যাক (Local fallback)
+    const mockUrl = URL.createObjectURL(file);
+    const metadataRow = {
+      userId,
+      fileName: file.name,
+      fileSize: file.size,
+      fileUrl: mockUrl,
+      uploadedAt: new Date().toISOString()
+    };
+    const storedMeta = localStorage.getItem(FILES_STORAGE_KEY);
+    const metaList = storedMeta ? JSON.parse(storedMeta) : [];
+    metaList.push(metadataRow);
+    localStorage.setItem(FILES_STORAGE_KEY, JSON.stringify(metaList));
+
+    return {
+      success: true,
+      url: mockUrl,
+      fileName: file.name,
+      fileSize: file.size,
+      error: null
+    };
   },
 
   // ৭. সিভি ইমপ্রুভমেন্ট হিস্ট্রি ট্র্যাক করা (Save CV Improvement History)
@@ -261,12 +301,19 @@ export const cvDb = {
         const { error } = await supabaseClient.from('cv_improvement_history').upsert(history);
         if (error) throw error;
       } catch (err: any) {
-        console.error('History save failed on Supabase:', err);
-        throw new Error('Supabase saveImprovementHistory failed: ' + err.message);
+        console.warn('History save failed on Supabase, using local state:', err);
       }
-    } else {
-      throw new Error('Supabase is not configured.');
     }
+
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    const list: CvImprovementHistory[] = stored ? JSON.parse(stored) : [];
+    const idx = list.findIndex(h => h.id === history.id);
+    if (idx > -1) {
+      list[idx] = history;
+    } else {
+      list.push(history);
+    }
+    localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(list));
   },
 
   getImprovementHistory: async (cvId: string): Promise<CvImprovementHistory[]> => {
@@ -277,12 +324,14 @@ export const cvDb = {
           .select('*')
           .eq('cvId', cvId);
         if (error) throw error;
-        return data || [];
+        if (data) return data;
       } catch (err: any) {
-        console.error('Get history from Supabase failed:', err);
-        throw new Error('Supabase getImprovementHistory failed: ' + err.message);
+        console.warn('Get history from Supabase failed, using local state:', err);
       }
     }
-    throw new Error('Supabase is not configured.');
+
+    const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+    const list: CvImprovementHistory[] = stored ? JSON.parse(stored) : [];
+    return list.filter(h => h.cvId === cvId);
   }
 };

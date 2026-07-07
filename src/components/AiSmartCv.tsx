@@ -35,11 +35,14 @@ interface Toast {
   type: 'success' | 'error' | 'info';
 }
 
+import { extractTextFromFile } from '../lib/fileParser';
+
 export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) => {
   // অ্যাপ স্টেটসমূহ (Core App States)
-  const [activeView, setActiveView] = useState<'home' | 'builder' | 'dashboard'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'builder' | 'dashboard' | 'analysis_preview'>('home');
   const [cvList, setCvList] = useState<CvData[]>([]);
   const [selectedCv, setSelectedCv] = useState<CvData | null>(null);
+  const [analysisPreview, setAnalysisPreview] = useState<CvData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -102,6 +105,8 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
       if (list.length > 0) {
         // সর্বশেষ এডিট করা সিভি সিলেক্ট করি (Select latest edited CV)
         setSelectedCv(list[0]);
+      } else {
+        setSelectedCv(null);
       }
     } catch (err) {
       showToast(isBn ? 'সিভি লোড করতে ব্যর্থ হয়েছে।' : 'Failed to load CVs.', 'error');
@@ -529,6 +534,22 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
     }
   };
 
+  const confirmAnalysisPreview = async () => {
+    if (!analysisPreview) return;
+    setSaving(true);
+    try {
+      await loadCvs();
+      setSelectedCv(analysisPreview);
+      setAnalysisPreview(null);
+      setActiveView('dashboard');
+      showToast(isBn ? 'সিভি সফলভাবে এনালাইসিস করা হয়েছে!' : 'CV analyzed and saved successfully!', 'success');
+    } catch (err) {
+      showToast('Error finalizing CV', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
 
   // ==========================================
   // ফিচার বি: ফাইল আপলোড এবং অটো এআই এনালাইসিস
@@ -593,61 +614,51 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
       showToast(isBn ? 'এআই সিভি এনালাইসিস এবং এক্সট্রাকশন চালু হচ্ছে...' : 'Extracting CV and calling AI Analysis...', 'info');
 
       // ২. ফাইল টেক্সট এনালাইসিস (Extract plain strings from document to feed into Groq)
-      // রিয়েল ব্রাউজারে আমরা ফাইলের নাম এবং কিছু রিড করা স্ট্রিং পাঠাই
-      const reader = new FileReader();
-      reader.onload = async () => {
-        try {
-          const rawText = reader.result as string;
-          // টেক্সট ফিল্টার করে কেবল সাধারণ রিডএবল স্ট্রিংগুলো রাখি
-          const printableText = rawText.replace(/[^\x20-\x7E\s]/g, '').substr(0, 4000);
+      const rawText = await extractTextFromFile(file);
+      
+      // টেক্সট ফিল্টার করে কেবল সাধারণ রিডএবল স্ট্রিংগুলো রাখি (remove some non-printable characters, keep newlines)
+      const printableText = rawText.replace(/[^\x20-\x7E\s\n]/g, '').substr(0, 15000);
 
-          setUploadProgress(85);
-          // গ্রক কল করা (Perform AI extraction & analysis on Groq Llama-3.1-70B)
-          const analysisResult = await cvGroq.analyzeUploadedCV(file.name, printableText);
+      setUploadProgress(85);
+      // গ্রক কল করা (Perform AI extraction & analysis on Groq Llama-3.1-70B)
+      const analysisResult = await cvGroq.analyzeUploadedCV(file.name, printableText);
 
-          setUploadProgress(95);
+      setUploadProgress(95);
 
-          // ৩. সিভি অবজেক্ট ডাটাবেজ-এ সেভ করা (Save analysis CvData to Supabase/localStorage)
-          const generatedId = 'cv_' + Math.random().toString(36).substr(2, 9);
-          const newCvData: CvData = {
-            id: generatedId,
-            userId,
-            personalInfo: analysisResult.extractedData.personalInfo as PersonalInfo,
-            careerSummary: analysisResult.extractedData.careerSummary || '',
-            education: analysisResult.extractedData.education || [],
-            experience: analysisResult.extractedData.experience || [],
-            projects: analysisResult.extractedData.projects || [],
-            skills: analysisResult.extractedData.skills || { softSkills: [], technicalSkills: [], languages: [], certificates: [] },
-            templateId: 'modern',
-            scores: analysisResult.scores,
-            feedback: analysisResult.feedback,
-            isAnalyzed: true,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
-
-          const dbRes = await cvDb.saveResume(newCvData);
-          if (dbRes.success) {
-            setUploadProgress(100);
-            showToast(isBn ? 'সিভি সফলভাবে আপলোড ও এনালাইসিস করা হয়েছে!' : 'CV uploaded and evaluated successfully!', 'success');
-            await loadCvs();
-            setSelectedCv(newCvData);
-            setActiveView('dashboard');
-          } else {
-            throw new Error(dbRes.error || 'Database save failed');
-          }
-        } catch (err: any) {
-          showToast(err.message || 'সিভি এনালাইসিস করতে সমস্যা হয়েছে।', 'error');
-        } finally {
-          setIsUploading(false);
-          setUploadProgress(0);
-        }
+      // ৩. সিভি অবজেক্ট ডাটাবেজ-এ সেভ করা (Save analysis CvData to Supabase/localStorage)
+      const generatedId = 'cv_' + Math.random().toString(36).substr(2, 9);
+      const newCvData: CvData = {
+        id: generatedId,
+        userId,
+        personalInfo: analysisResult.extractedData.personalInfo as PersonalInfo,
+        careerSummary: analysisResult.extractedData.careerSummary || '',
+        education: analysisResult.extractedData.education || [],
+        experience: analysisResult.extractedData.experience || [],
+        projects: analysisResult.extractedData.projects || [],
+        skills: analysisResult.extractedData.skills || { softSkills: [], technicalSkills: [], languages: [], certificates: [] },
+        templateId: 'modern',
+        scores: analysisResult.scores,
+        feedback: analysisResult.feedback,
+        isAnalyzed: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
       };
 
-      reader.readAsText(file); // text buffer read to get raw strings
+      const dbRes = await cvDb.saveResume(newCvData);
+      if (dbRes.success) {
+        setUploadProgress(100);
+        showToast(isBn ? 'এনালাইসিস সম্পন্ন! ডাটা যাচাই করুন।' : 'Analysis complete! Please verify the data.', 'success');
+        setAnalysisPreview(newCvData);
+        setActiveView('analysis_preview');
+      } else {
+        throw new Error(dbRes.error || 'Database save failed');
+      }
 
     } catch (err: any) {
       showToast(err.message || 'আপলোড ব্যর্থ হয়েছে।', 'error');
+      setIsUploading(false);
+      setUploadProgress(0);
+    } finally {
       setIsUploading(false);
       setUploadProgress(0);
     }
@@ -925,9 +936,17 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                             onClick={async (e) => {
                               e.stopPropagation();
                               if (confirm(isBn ? 'সিভিটি মুছে ফেলতে চান?' : 'Are you sure to delete this resume?')) {
-                                await cvDb.deleteResume(cv.id, userId);
-                                showToast(isBn ? 'সিভি মুছে ফেলা হয়েছে' : 'CV deleted successfully');
-                                loadCvs();
+                                try {
+                                  const res = await cvDb.deleteResume(cv.id, userId);
+                                  if (res.success) {
+                                    showToast(isBn ? 'সিভি মুছে ফেলা হয়েছে' : 'CV deleted successfully');
+                                    await loadCvs();
+                                  } else {
+                                    showToast(res.error || (isBn ? 'মুছে ফেলতে ব্যর্থ' : 'Delete failed'), 'error');
+                                  }
+                                } catch (err) {
+                                  showToast(isBn ? 'মুছে ফেলতে ত্রুটি হয়েছে' : 'Error deleting CV', 'error');
+                                }
                               }
                             }}
                             className="p-1 text-slate-500 hover:text-red-400 transition-colors"
@@ -982,6 +1001,100 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                 </div>
               </div>
             )}
+          </motion.div>
+        )}
+
+        {activeView === 'analysis_preview' && analysisPreview && (
+          <motion.div
+            key="analysis_preview"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex flex-col gap-8 max-w-4xl mx-auto w-full py-8 px-4"
+          >
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
+                <Sparkles className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-black text-white">{isBn ? 'সিভি এনালাইসিস সম্পন্ন!' : 'CV Analysis Completed!'}</h2>
+              <p className="text-slate-400 text-sm mt-1">{isBn ? 'আমরা আপনার সিভি থেকে নিচের তথ্যগুলো এক্সট্রাক্ট করেছি।' : 'We have extracted the following information from your CV.'}</p>
+            </div>
+
+            <div className="grid gap-6">
+              <Card className="p-6 border-white/5 bg-[#0a0a0a]">
+                <h3 className="text-emerald-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4" /> {isBn ? 'ব্যক্তিগত তথ্য' : 'Personal Info'}
+                </h3>
+                <div className="grid sm:grid-cols-2 gap-4 text-slate-300 text-sm">
+                  <p><span className="text-slate-500 font-medium">Name:</span> {analysisPreview.personalInfo.name}</p>
+                  <p><span className="text-slate-500 font-medium">Email:</span> {analysisPreview.personalInfo.email}</p>
+                  <p><span className="text-slate-500 font-medium">Phone:</span> {analysisPreview.personalInfo.phone}</p>
+                  <p><span className="text-slate-500 font-medium">Address:</span> {analysisPreview.personalInfo.address}</p>
+                </div>
+              </Card>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <Card className="p-6 border-white/5 bg-[#0a0a0a]">
+                  <h3 className="text-cyan-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                    <GraduationCap className="w-4 h-4" /> {isBn ? 'শিক্ষা' : 'Education'}
+                  </h3>
+                  <ul className="space-y-3">
+                    {analysisPreview.education.map((edu, i) => (
+                      <li key={i} className="text-sm text-slate-300 border-l-2 border-cyan-500/30 pl-3">
+                        <p className="font-bold">{edu.degree}</p>
+                        <p className="text-xs text-slate-500">{edu.institution} | {edu.year}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+
+                <Card className="p-6 border-white/5 bg-[#0a0a0a]">
+                  <h3 className="text-purple-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                    <Briefcase className="w-4 h-4" /> {isBn ? 'অভিজ্ঞতা' : 'Experience'}
+                  </h3>
+                  <ul className="space-y-3">
+                    {analysisPreview.experience.map((exp, i) => (
+                      <li key={i} className="text-sm text-slate-300 border-l-2 border-purple-500/30 pl-3">
+                        <p className="font-bold">{exp.role}</p>
+                        <p className="text-xs text-slate-500">{exp.company}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              </div>
+
+              <Card className="p-6 border-white/5 bg-[#0a0a0a]">
+                <h3 className="text-amber-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                  <Cpu className="w-4 h-4" /> {isBn ? 'স্কিলস' : 'Skills'}
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {analysisPreview.skills.technicalSkills.map((sk, i) => (
+                    <Badge key={i} variant="info" className="bg-amber-500/10 text-amber-400 border-amber-500/20">{sk}</Badge>
+                  ))}
+                  {analysisPreview.skills.softSkills.map((sk, i) => (
+                    <Badge key={i} variant="glass" className="text-slate-400">{sk}</Badge>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            <div className="flex justify-center gap-4 mt-4">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setAnalysisPreview(null);
+                  setActiveView('home');
+                }}
+              >
+                {isBn ? 'বাতিল করুন' : 'Cancel'}
+              </Button>
+              <Button 
+                variant="brand" 
+                onClick={confirmAnalysisPreview}
+                className="px-8"
+              >
+                {isBn ? 'ড্যাশবোর্ডে দেখুন' : 'Go to Dashboard'} <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
           </motion.div>
         )}
 
@@ -1592,7 +1705,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                     </p>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {(['modern', 'minimal', 'corporate', 'creative', 'ats_friendly'] as ResumeTemplateId[]).map((tempId) => (
+                      {(['modern', 'minimal', 'corporate', 'creative', 'ats_friendly', 'harshibar', 'puneet_gautam', 'curve'] as ResumeTemplateId[]).map((tempId) => (
                         <div 
                           key={tempId}
                           onClick={() => {
@@ -1848,7 +1961,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                   <div className="flex flex-col gap-3">
                     <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-bold">STRENGTHS</span>
                     <ul className="space-y-2">
-                      {selectedCv.feedback?.strengths.map((str, i) => (
+                      {Array.isArray(selectedCv.feedback?.strengths) && selectedCv.feedback?.strengths.map((str, i) => (
                         <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
                           <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                           <span>{str}</span>
@@ -1861,7 +1974,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                   <div className="flex flex-col gap-3">
                     <span className="text-[10px] font-mono text-red-400 uppercase tracking-wider font-bold">WEAKNESSES / REMEDIATIONS</span>
                     <ul className="space-y-2">
-                      {selectedCv.feedback?.weaknesses.map((wk, i) => (
+                      {Array.isArray(selectedCv.feedback?.weaknesses) && selectedCv.feedback?.weaknesses.map((wk, i) => (
                         <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
                           <X className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
                           <span>{wk}</span>
@@ -1883,7 +1996,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
                 <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider">MISSING TECH SKILLS</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
-                  {selectedCv.feedback?.missingSkills?.map((sk, i) => (
+                  {Array.isArray(selectedCv.feedback?.missingSkills) && selectedCv.feedback?.missingSkills.map((sk, i) => (
                     <Badge key={i} variant="info" className="text-[10px] px-2 py-0.5">{sk}</Badge>
                   ))}
                 </div>
@@ -1893,7 +2006,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
                 <span className="text-[10px] font-mono text-amber-500 font-bold uppercase tracking-wider">GRAMMAR & WRITING ISSUES</span>
                 <ul className="space-y-1.5 text-xs text-slate-300">
-                  {selectedCv.feedback?.grammarProblems?.map((prob, i) => (
+                  {Array.isArray(selectedCv.feedback?.grammarProblems) && selectedCv.feedback?.grammarProblems.map((prob, i) => (
                     <li key={i} className="flex gap-2">
                       <div className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 shrink-0" />
                       <span>{prob}</span>
@@ -1906,7 +2019,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
                 <span className="text-[10px] font-mono text-purple-400 font-bold uppercase tracking-wider">ATS FORMAT COMPLIANCE</span>
                 <ul className="space-y-1.5 text-xs text-slate-300">
-                  {selectedCv.feedback?.atsIssues?.map((iss, i) => (
+                  {Array.isArray(selectedCv.feedback?.atsIssues) && selectedCv.feedback?.atsIssues.map((iss, i) => (
                     <li key={i} className="flex gap-2">
                       <div className="w-1 h-1 rounded-full bg-purple-500 mt-1.5 shrink-0" />
                       <span>{iss}</span>
@@ -1919,7 +2032,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
                 <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">CAREER ROADMAP ADVICE</span>
                 <ul className="space-y-1.5 text-xs text-slate-300">
-                  {selectedCv.feedback?.careerSuggestions?.map((sug, i) => (
+                  {Array.isArray(selectedCv.feedback?.careerSuggestions) && selectedCv.feedback?.careerSuggestions.map((sug, i) => (
                     <li key={i} className="flex gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
                       <span>{sug}</span>
@@ -1958,6 +2071,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
                     <option value="corporate">Corporate</option>
                     <option value="creative">Creative</option>
                     <option value="ats_friendly">ATS Friendly</option>
+                    <option value="harshibar">Harshibar</option>
+                    <option value="puneet_gautam">Puneet Gautam</option>
+                    <option value="curve">Curve</option>
                   </select>
                 </div>
               </div>
@@ -2056,6 +2172,12 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
         return renderCreative(cv);
       case 'ats_friendly':
         return renderAtsFriendly(cv);
+      case 'harshibar':
+        return renderHarshibar(cv);
+      case 'puneet_gautam':
+        return renderPuneetGautam(cv);
+      case 'curve':
+        return renderCurve(cv);
       default:
         return renderModern(cv);
     }
@@ -2446,6 +2568,316 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack }) =>
             <strong>Soft Professional Skills:</strong> {cv.skills.softSkills.join(', ')} <br />
             <strong>Languages:</strong> {cv.skills.languages.join(', ')}
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // ৬. HARSHIBAR TEMPLATE (হার্ষিবার টেমপ্লেট)
+  function renderHarshibar(cv: CvData) {
+    return (
+      <div className="p-8 leading-normal select-text text-[11px] text-[#141414] bg-white font-sans">
+        <div className="text-center mb-6">
+          <h1 className="text-3xl font-black tracking-tight text-black mb-2">{cv.personalInfo.name}</h1>
+          <div className="flex justify-center items-center gap-3 text-slate-600 text-[10px]">
+            <span className="flex items-center gap-1"><Activity className="w-3 h-3" /> {cv.personalInfo.phone}</span>
+            <span className="text-slate-300">|</span>
+            <span className="flex items-center gap-1"><Globe className="w-3 h-3" /> {cv.personalInfo.email}</span>
+            {cv.personalInfo.linkedin && (
+              <>
+                <span className="text-slate-300">|</span>
+                <span className="flex items-center gap-1"><Cpu className="w-3 h-3" /> {cv.personalInfo.linkedin}</span>
+              </>
+            )}
+          </div>
+        </div>
+
+        {cv.experience?.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold border-b-2 border-slate-200 pb-0.5 mb-3 uppercase tracking-wider text-black">Experience</h2>
+            <div className="space-y-4">
+              {cv.experience.map((exp) => (
+                <div key={exp.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-xs font-bold text-black">{exp.company}</h3>
+                    <span className="text-[10px] text-slate-500">{exp.duration}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline italic text-slate-600 mb-1">
+                    <span>{exp.role}</span>
+                    <span className="text-[9px] not-italic uppercase tracking-widest">{cv.personalInfo.address}</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-slate-700">
+                    {exp.description.split('\n').filter(l => l.trim()).map((line, idx) => (
+                      <li key={idx} className="leading-relaxed pl-1 -indent-5 ml-5">{line.trim().startsWith('•') ? line.trim().substring(1).trim() : line.trim()}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {cv.projects?.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold border-b-2 border-slate-200 pb-0.5 mb-3 uppercase tracking-wider text-black">Projects</h2>
+            <div className="space-y-4">
+              {cv.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-xs font-bold text-black">{proj.title}</h3>
+                    <span className="text-[10px] text-slate-500">{proj.techStack}</span>
+                  </div>
+                  <ul className="list-disc list-inside space-y-1 text-slate-700">
+                    {proj.description.split('\n').filter(l => l.trim()).map((line, idx) => (
+                      <li key={idx} className="leading-relaxed pl-1 -indent-5 ml-5">{line.trim().startsWith('•') ? line.trim().substring(1).trim() : line.trim()}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {cv.education?.length > 0 && (
+          <div className="mb-6">
+            <h2 className="text-sm font-bold border-b-2 border-slate-200 pb-0.5 mb-3 uppercase tracking-wider text-black">Education</h2>
+            <div className="space-y-3">
+              {cv.education.map((edu) => (
+                <div key={edu.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <h3 className="text-xs font-bold text-black">{edu.institution}</h3>
+                    <span className="text-[10px] text-slate-500">{edu.year}</span>
+                  </div>
+                  <div className="text-slate-600 italic">{edu.degree}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-2">
+          <h2 className="text-sm font-bold border-b-2 border-slate-200 pb-0.5 mb-2 uppercase tracking-wider text-black">Skills</h2>
+          <div className="space-y-1.5 text-slate-700">
+            <p><span className="font-bold text-black">Languages:</span> {cv.skills.technicalSkills.join(', ')}</p>
+            <p><span className="font-bold text-black">Tools:</span> {cv.skills.softSkills.join(', ')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ৭. PUNEET GAUTAM TEMPLATE (পুনিট গৌতম টেমপ্লেট)
+  function renderPuneetGautam(cv: CvData) {
+    return (
+      <div className="p-6 leading-normal select-text text-[10.5px] text-[#222] bg-white font-serif">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="w-16 h-16 bg-slate-100 flex items-center justify-center border border-slate-300 rounded shrink-0">
+             <Activity className="w-10 h-10 text-slate-400" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-2xl font-bold text-black tracking-tight leading-none mb-2">{cv.personalInfo.name}</h1>
+                <p className="italic text-slate-700">Bachelor of Technology</p>
+                <p className="text-slate-600">Guru Gobind Singh Indraprastha University, New Delhi</p>
+              </div>
+              <div className="text-right space-y-0.5 text-slate-700">
+                <p>{cv.personalInfo.phone}</p>
+                <p className="underline">{cv.personalInfo.email}</p>
+                <p className="underline">GitHub</p>
+                <p className="underline">LinkedIn</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4">
+           <div className="bg-slate-100 px-3 py-1 mb-2 font-bold text-sm uppercase">Education</div>
+           <table className="w-full border-collapse border border-slate-300 text-center">
+             <thead>
+               <tr className="bg-slate-50">
+                 <th className="border border-slate-300 p-1.5">Year</th>
+                 <th className="border border-slate-300 p-1.5">Degree/Certificate</th>
+                 <th className="border border-slate-300 p-1.5">Institute</th>
+                 <th className="border border-slate-300 p-1.5">CGPA/%</th>
+               </tr>
+             </thead>
+             <tbody>
+               {cv.education?.map((edu) => (
+                 <tr key={edu.id}>
+                   <td className="border border-slate-300 p-1.5">{edu.year}</td>
+                   <td className="border border-slate-300 p-1.5">{edu.degree}</td>
+                   <td className="border border-slate-300 p-1.5">{edu.institution}</td>
+                   <td className="border border-slate-300 p-1.5">{edu.gpa || 'N/A'}</td>
+                 </tr>
+               ))}
+             </tbody>
+           </table>
+        </div>
+
+        {cv.experience?.length > 0 && (
+          <div className="mb-4">
+            <div className="bg-slate-100 px-3 py-1 mb-2 font-bold text-sm uppercase">Experience</div>
+            <div className="space-y-4">
+              {cv.experience.map((exp) => (
+                <div key={exp.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <span className="font-bold text-black flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-black rounded-full" /> {exp.company}
+                    </span>
+                    <span className="italic text-slate-600 text-[10px]">{exp.duration}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline mb-2">
+                    <span className="italic text-slate-700 text-[10px] pl-3">{exp.role}</span>
+                    <span className="text-slate-600 text-[10px] uppercase">{cv.personalInfo.address}</span>
+                  </div>
+                  <ul className="list-inside space-y-1 text-slate-700 pl-3">
+                    {exp.description.split('\n').filter(l => l.trim()).map((line, idx) => (
+                      <li key={idx} className="flex gap-2">
+                        <span className="shrink-0">–</span>
+                        <span>{line.trim()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {cv.projects?.length > 0 && (
+          <div className="mb-4">
+            <div className="bg-slate-100 px-3 py-1 mb-2 font-bold text-sm uppercase">Projects</div>
+            <div className="space-y-4">
+              {cv.projects.map((proj) => (
+                <div key={proj.id}>
+                  <div className="flex justify-between items-baseline mb-1">
+                    <span className="font-bold text-black flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-black rounded-full" /> {proj.title}
+                    </span>
+                    <span className="italic text-slate-600 text-[10px]">{proj.techStack}</span>
+                  </div>
+                  <div className="flex justify-between items-baseline mb-1 pl-3">
+                    <span className="italic text-slate-700 text-[10px]">Academic Project</span>
+                    <span className="text-emerald-700 font-bold underline cursor-pointer text-[10px]">GitHub</span>
+                  </div>
+                  <ul className="list-inside space-y-1 text-slate-700 pl-3">
+                    {proj.description.split('\n').filter(l => l.trim()).map((line, idx) => (
+                      <li key={idx} className="flex gap-2">
+                        <span className="shrink-0">–</span>
+                        <span>{line.trim()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mb-2">
+          <div className="bg-slate-100 px-3 py-1 mb-2 font-bold text-sm uppercase">Technical Skills</div>
+          <div className="space-y-2 pl-3">
+            <p><span className="w-1.5 h-1.5 bg-black rounded-full inline-block mr-2" /> <span className="font-bold text-black">Programming Languages:</span> {cv.skills.technicalSkills.join(', ')}</p>
+            <p><span className="w-1.5 h-1.5 bg-black rounded-full inline-block mr-2" /> <span className="font-bold text-black">Tools and Frameworks:</span> {cv.skills.softSkills.join(', ')}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ৮. CURVE TEMPLATE (কার্ভ টেমপ্লেট)
+  function renderCurve(cv: CvData) {
+    return (
+      <div className="p-10 leading-normal select-text text-[11px] text-[#333] bg-white font-sans">
+        <div className="flex justify-between items-start mb-8">
+           <div className="flex-1">
+             <h1 className="text-2xl font-black text-black tracking-tight mb-4">{cv.personalInfo.name}</h1>
+             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600 text-[10px]">
+               <span className="flex items-center gap-2"><Plus className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.email}</span>
+               <span className="flex items-center gap-2"><RefreshCw className="w-3 h-3 text-emerald-500" /> @{cv.personalInfo.name.toLowerCase().replace(' ', '_')}</span>
+               <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.linkedin || 'LinkedIn'}</span>
+               <span className="flex items-center gap-2"><Globe className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.portfolio || 'Website'}</span>
+             </div>
+           </div>
+           <div className="w-20 h-20 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-inner p-2">
+              <div className="w-full h-full bg-slate-200 rounded-xl flex items-center justify-center">
+                 <Briefcase className="w-10 h-10 text-slate-400 opacity-50" />
+              </div>
+           </div>
+        </div>
+
+        <div className="mb-8">
+           <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
+             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="shrink-0 uppercase tracking-widest text-xs">Employment History</span>
+             <span className="w-12 h-0.5 bg-emerald-500/20" />
+           </h2>
+           <div className="space-y-6">
+             {cv.experience?.map((exp) => (
+               <div key={exp.id} className="flex gap-6">
+                 <div className="w-24 shrink-0 text-slate-500 font-mono text-[10px] pt-1">
+                   {exp.duration}
+                 </div>
+                 <div className="flex-1">
+                   <div className="flex items-center gap-2 mb-2">
+                     <span className="w-5 h-5 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                       <Plus className="w-3 h-3 text-emerald-500" />
+                     </span>
+                     <h3 className="font-bold text-black">{exp.company}</h3>
+                     <span className="text-slate-400 text-[10px] italic">Village of Frying Pans</span>
+                   </div>
+                   <p className="text-slate-800 font-bold mb-1">{exp.role}</p>
+                   <p className="text-slate-600 leading-relaxed italic">{exp.description}</p>
+                 </div>
+               </div>
+             ))}
+           </div>
+        </div>
+
+        <div className="mb-8">
+           <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
+             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="shrink-0 uppercase tracking-widest text-xs">Education</span>
+             <span className="w-12 h-0.5 bg-emerald-500/20" />
+           </h2>
+           <div className="space-y-6">
+             {cv.education?.map((edu) => (
+               <div key={edu.id} className="flex gap-6">
+                 <div className="w-24 shrink-0 text-slate-500 font-mono text-[10px] pt-1">
+                   {edu.year}
+                 </div>
+                 <div className="flex-1">
+                   <div className="flex items-center gap-2 mb-1">
+                     <span className="w-5 h-5 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                       <Plus className="w-3 h-3 text-emerald-500" />
+                     </span>
+                     <h3 className="font-bold text-black">{edu.institution}</h3>
+                   </div>
+                   <p className="text-slate-800 font-bold mb-1">{edu.degree}</p>
+                   {edu.gpa && <p className="text-slate-500 italic">Grade: {edu.gpa}</p>}
+                 </div>
+               </div>
+             ))}
+           </div>
+        </div>
+
+        <div>
+           <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
+             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="shrink-0 uppercase tracking-widest text-xs">Skills</span>
+             <span className="w-12 h-0.5 bg-emerald-500/20" />
+           </h2>
+           <div className="space-y-3 pl-32">
+             <div className="flex gap-4">
+               <span className="w-20 font-bold text-slate-500">Languages</span>
+               <span className="flex-1 text-slate-800">{cv.skills.technicalSkills.join(', ')}</span>
+             </div>
+             <div className="flex gap-4">
+               <span className="w-20 font-bold text-slate-500">Tools</span>
+               <span className="flex-1 text-slate-800">{cv.skills.softSkills.join(', ')}</span>
+             </div>
+           </div>
         </div>
       </div>
     );

@@ -144,7 +144,7 @@ export interface CvSkills {
   certificates: string[];
 }
 
-export type ResumeTemplateId = 'modern' | 'minimal' | 'corporate' | 'creative' | 'ats_friendly';
+export type ResumeTemplateId = 'modern' | 'minimal' | 'corporate' | 'creative' | 'ats_friendly' | 'harshibar' | 'puneet_gautam' | 'curve';
 
 export interface AiScores {
   atsScore: number;

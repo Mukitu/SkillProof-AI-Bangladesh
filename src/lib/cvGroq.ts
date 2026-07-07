@@ -29,7 +29,7 @@ if (groqApiKey && groqApiKey !== 'YOUR_GROQ_API_KEY') {
 }
 
 // গ্রক মডেল নির্ধারণ (Groq Llama-3.1 model)
-const MODEL_NAME = 'llama-3.1-70b-versatile';
+const MODEL_NAME = 'llama-3.3-70b-versatile';
 
 export const cvGroq = {
   isConfigured: () => isRealGroq,
@@ -107,66 +107,70 @@ Respond ONLY with the rewritten text. Do not write intro, explanation, or markdo
     feedback: AiFeedback;
     extractedData: Partial<CvData>;
   }> => {
-    const prompt = `You are an advanced AI Resume Screener and CV Intelligence agent.
-Analyze the following text extracted from a resume file named "${fileName}".
-You must perform three tasks:
-1. Extract the structured resume details (Name, Education, Skills, Work Experience, Projects, etc.).
-2. Evaluate and generate precise professional scores (ATS Score, Quality Score, etc. out of 100).
-3. Generate detailed, actionable professional feedback (Strengths, Weaknesses, Grammar, formatting, missing skills).
+    const prompt = `You are a high-performance ATS Parser and Career Strategist.
+Analyze the following raw text from a resume file named "${fileName}".
+Extract ALL relevant professional data and evaluate the profile.
+
+CRITICAL INSTRUCTIONS:
+1. Extract data accurately. Do NOT miss contact info (email, phone, address).
+2. If specific contact info is missing, search the entire text thoroughly for patterns (e.g., xxx@email.com, +880...).
+3. Categorize skills into "technicalSkills" (languages, frameworks, tools) and "softSkills" (communication, leadership, etc.).
+4. For Education, Experience, and Projects, ensure every item has a unique "id" (e.g., edu_1, exp_1).
+5. Provide specific, non-generic feedback.
 
 Extracted Text:
 """
-${fileText || 'No text extracted, analyze based on filename and typical tech profiles.'}
+${fileText}
 """
 
-You MUST respond with a single, valid JSON object containing exactly the following keys (do not wrap in markdown tags like \`\`\`json, just output raw JSON):
+RESPONSE FORMAT (Strict JSON):
 {
   "extractedData": {
     "personalInfo": {
-      "name": "string (extract or deduce name)",
-      "phone": "string (extract phone)",
-      "email": "string (extract email)",
-      "address": "string",
-      "linkedin": "string",
-      "github": "string",
-      "portfolio": "string"
+      "name": "Full Name",
+      "phone": "Phone Number",
+      "email": "Email Address",
+      "address": "Location/City",
+      "linkedin": "LinkedIn URL",
+      "github": "GitHub URL",
+      "portfolio": "Portfolio/Website"
     },
-    "careerSummary": "string (1 paragraph career summary)",
+    "careerSummary": "Professional summary",
     "education": [
-      { "id": "edu1", "degree": "string", "institution": "string", "year": "string", "gpa": "string" }
+      { "id": "edu_1", "degree": "Degree", "institution": "University", "year": "Year", "gpa": "GPA" }
     ],
     "experience": [
-      { "id": "exp1", "company": "string", "role": "string", "duration": "string", "description": "string", "isCurrent": false }
+      { "id": "exp_1", "company": "Company", "role": "Title", "duration": "Duration", "description": "Details", "isCurrent": false }
     ],
     "projects": [
-      { "id": "proj1", "title": "string", "description": "string", "techStack": "string", "github": "string", "liveLink": "string" }
+      { "id": "proj_1", "title": "Project Name", "description": "Details", "techStack": "Tech Used", "github": "Repo URL" }
     ],
     "skills": {
-      "softSkills": ["string"],
-      "technicalSkills": ["string"],
-      "languages": ["string"],
-      "certificates": ["string"]
+      "softSkills": ["Skill"],
+      "technicalSkills": ["Skill"],
+      "languages": ["English"],
+      "certificates": ["Cert Name"]
     }
   },
   "scores": {
-    "atsScore": number (30-100),
-    "resumeQualityScore": number (30-100),
-    "skillScore": number (30-100),
-    "professionalismScore": number (30-100),
-    "communicationScore": number (30-100)
+    "atsScore": 0-100,
+    "resumeQualityScore": 0-100,
+    "skillScore": 0-100,
+    "professionalismScore": 0-100,
+    "communicationScore": 0-100
   },
   "feedback": {
-    "strengths": ["string (3 specific strengths)"],
-    "weaknesses": ["string (3 specific weaknesses)"],
-    "missingSkills": ["string (specific skills needed for current market)"],
-    "grammarProblems": ["string (grammar warnings or 'None found')"],
-    "formattingIssues": ["string (formatting suggestions)"],
-    "atsIssues": ["string (ATS parsability warnings)"],
-    "careerSuggestions": ["string (career recommendations)"]
+    "strengths": ["string"],
+    "weaknesses": ["string"],
+    "missingSkills": ["string"],
+    "grammarProblems": ["string"],
+    "formattingIssues": ["string"],
+    "atsIssues": ["string"],
+    "careerSuggestions": ["string"]
   }
 }
 
-Ensure all lists are populated with real, helpful data based on the CV.`;
+Respond ONLY with the raw JSON object.`;
 
     if (isRealGroq && groqClient) {
       try {

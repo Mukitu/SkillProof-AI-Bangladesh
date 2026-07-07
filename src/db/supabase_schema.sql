@@ -40,24 +40,30 @@ CREATE TABLE IF NOT EXISTS public.user_settings (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- ৩. সিভি ফোল্ডার বা মেটাডেটা (cv_files_metadata & cv_resumes)
+-- ৩. সিভি ফোল্ডার (cv_resumes)
 CREATE TABLE IF NOT EXISTS public.cv_resumes (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    content TEXT,
-    skills TEXT,
-    experience TEXT,
-    education TEXT,
-    analysis TEXT,
-    score INT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    id TEXT PRIMARY KEY,
+    "userId" UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
+    "personalInfo" TEXT,
+    "careerSummary" TEXT,
+    "improvedCareerSummary" TEXT,
+    "education" TEXT,
+    "experience" TEXT,
+    "projects" TEXT,
+    "skills" TEXT,
+    "templateId" TEXT,
+    "createdAt" TEXT NOT NULL,
+    "updatedAt" TEXT NOT NULL,
+    "scores" TEXT,
+    "feedback" TEXT,
+    "isAnalyzed" BOOLEAN DEFAULT FALSE
 );
 
 -- ৪. ইন্টারভিউ সেশন (interview_sessions)
 CREATE TABLE IF NOT EXISTS public.interview_sessions (
     id TEXT PRIMARY KEY,
     "userId" UUID REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL,
-    "cvId" UUID,
+    "cvId" TEXT,
     "careerPath" TEXT NOT NULL,
     status VARCHAR(20) DEFAULT 'pending' NOT NULL,
     skills TEXT,
@@ -116,14 +122,13 @@ ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 -- Profiles Policies
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
--- Important: allow insertion during signup via API if trigger is not used
 CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- User Settings Policies
 CREATE POLICY "Users can manage own settings" ON public.user_settings FOR ALL USING (auth.uid() = user_id);
 
 -- CV Resumes Policies
-CREATE POLICY "Users can manage own resumes" ON public.cv_resumes FOR ALL USING (auth.uid() = user_id);
+CREATE POLICY "Users can manage own resumes" ON public.cv_resumes FOR ALL USING (auth.uid() = "userId");
 
 -- Interviews Policies
 CREATE POLICY "Users can manage own interview sessions" ON public.interview_sessions FOR ALL USING (auth.uid() = "userId");

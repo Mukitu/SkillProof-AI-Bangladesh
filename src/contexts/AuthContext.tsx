@@ -5,7 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, UserSettings } from '../types';
-import { mockAuth, mockDb } from '../lib/supabase';
+import { mockAuth, mockDb, isRealSupabase, supabaseClient } from '../lib/supabase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -70,10 +70,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signup = async (email: string, password: string, fullName: string) => {
     setLoading(true);
     const { data, error } = await mockAuth.signUp(email, password, fullName);
-    setLoading(false);
+    
     if (error) {
+      setLoading(false);
       return { success: false, verificationRequired: false, error: error.message };
     }
+
+    if (isRealSupabase && supabaseClient && data?.user) {
+      try {
+        const user = data.user;
+        // ১. প্রোফাইল টেবিলে তথ্য সংরক্ষণ করা (Automatically create user profile row)
+        const profileRow = {
+          id: user.id,
+          full_name: fullName,
+          email: email,
+          skills: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: profileError } = await supabaseClient
+          .from('profiles')
+          .upsert(profileRow, { onConflict: 'id' });
+
+        if (profileError) {
+          console.error('Error inserting profiles table in signup:', profileError);
+        }
+
+        // ২. সেটিংস টেবিলে ডিফল্ট তথ্য সংরক্ষণ করা (Create default settings row)
+        const settingsRow = {
+          user_id: user.id,
+          language: 'bn',
+          theme: 'dark',
+          notifications_enabled: true,
+          marketing_emails: false,
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: settingsError } = await supabaseClient
+          .from('user_settings')
+          .upsert(settingsRow, { onConflict: 'user_id' });
+
+        if (settingsError) {
+          console.error('Error inserting settings table in signup:', settingsError);
+        }
+      } catch (err) {
+        console.error('Error creating profile and settings records:', err);
+      }
+    }
+
+    setLoading(false);
     return { 
       success: true, 
       verificationRequired: !!data?.emailVerificationRequired, 
