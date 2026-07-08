@@ -120,7 +120,7 @@ export const PublicPassportPage: React.FC<{ passportId: string }> = ({ passportI
         </div>
 
         {/* ২. পাবলিক প্রোফাইল ব্যানার (PUBLIC BANNER) */}
-        <Card className="relative overflow-hidden border border-white/5 bg-[#0a0a0a] rounded-3xl p-6 lg:p-8 shadow-2xl">
+        <Card id="cv-print-area" className="relative overflow-hidden border border-white/5 bg-[#0a0a0a] rounded-3xl p-6 lg:p-8 shadow-2xl">
           <div className="absolute -right-24 -top-24 w-80 h-80 bg-emerald-500/10 blur-[100px] rounded-full pointer-events-none" />
           
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8 relative z-10">
@@ -130,6 +130,7 @@ export const PublicPassportPage: React.FC<{ passportId: string }> = ({ passportI
                   src={profile.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80'} 
                   alt={profile.fullName} 
                   className="w-24 h-24 rounded-2xl object-cover border-2 border-emerald-500/20 shadow-xl"
+                  crossOrigin="anonymous"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-slate-950 p-1.5 rounded-lg border border-slate-950 shadow-md">

@@ -237,6 +237,8 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     color: #1e293b !important;
     box-shadow: none !important;
     border: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 
   @page {
