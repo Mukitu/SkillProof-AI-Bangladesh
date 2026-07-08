@@ -34,27 +34,34 @@ export const interviewDb = {
 
   // ২. সব ইন্টারভিউ সেশন লোড করা (Get all interview sessions for a user)
   getSessions: async (userId: string): Promise<InterviewSession[]> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('interview_sessions')
           .select('*')
-          .eq('userId', userId)
-          .order('createdAt', { ascending: false });
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
         if (error) throw error;
         if (data) {
           return data.map((item: any) => ({
-            ...item,
-            skills: typeof item.skills === 'string' ? JSON.parse(item.skills) : item.skills,
-            scores: typeof item.scores === 'string' ? JSON.parse(item.scores) : item.scores,
-            feedback: typeof item.feedback === 'string' ? JSON.parse(item.feedback) : item.feedback,
-            qa: typeof item.qa === 'string' ? JSON.parse(item.qa) : item.qa,
+            id: item.id,
+            userId: item.user_id,
+            cvId: item.cv_id,
+            careerPath: item.career_path,
+            skills: item.skills,
+            status: item.status,
+            scores: item.scores,
+            feedback: item.feedback,
+            duration: item.duration,
+            qa: item.qa,
+            createdAt: item.created_at,
+            completedAt: item.completed_at
           }));
         }
         return [];
       } catch (err: any) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        console.error('❌ Interview Database Fetch Error:', err.message || err);
       }
     }
 
@@ -65,23 +72,30 @@ export const interviewDb = {
 
   // ৩. সিঙ্গেল ইন্টারভিউ সেশন লোড করা (Get single interview by ID)
   getSessionById: async (id: string, userId: string): Promise<InterviewSession | null> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('interview_sessions')
           .select('*')
           .eq('id', id)
-          .eq('userId', userId)
+          .eq('user_id', userId)
           .single();
 
         if (error) throw error;
         if (data) {
           return {
-            ...data,
-            skills: typeof data.skills === 'string' ? JSON.parse(data.skills) : data.skills,
-            scores: typeof data.scores === 'string' ? JSON.parse(data.scores) : data.scores,
-            feedback: typeof data.feedback === 'string' ? JSON.parse(data.feedback) : data.feedback,
-            qa: typeof data.qa === 'string' ? JSON.parse(data.qa) : data.qa,
+            id: data.id,
+            userId: data.user_id,
+            cvId: data.cv_id,
+            careerPath: data.career_path,
+            skills: data.skills,
+            status: data.status,
+            scores: data.scores,
+            feedback: data.feedback,
+            duration: data.duration,
+            qa: data.qa,
+            createdAt: data.created_at,
+            completedAt: data.completed_at
           };
         }
         return null;
@@ -97,21 +111,21 @@ export const interviewDb = {
 
   // ৪. ইন্টারভিউ সেশন সংরক্ষণ (Save or Update Interview Session)
   saveSession: async (session: InterviewSession): Promise<{ success: boolean; error: string | null }> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const row = {
           id: session.id,
-          userId: session.userId,
-          cvId: session.cvId,
-          careerPath: session.careerPath,
-          skills: JSON.stringify(session.skills),
+          user_id: session.userId,
+          cv_id: session.cvId,
+          career_path: session.careerPath,
+          skills: session.skills,
           status: session.status,
-          scores: session.scores ? JSON.stringify(session.scores) : null,
-          feedback: session.feedback ? JSON.stringify(session.feedback) : null,
+          scores: session.scores || null,
+          feedback: session.feedback || null,
           duration: session.duration,
-          createdAt: session.createdAt,
-          completedAt: session.completedAt || null,
-          qa: JSON.stringify(session.qa)
+          created_at: session.createdAt,
+          completed_at: session.completedAt || null,
+          qa: session.qa
         };
 
         const { error } = await supabaseClient
@@ -121,7 +135,8 @@ export const interviewDb = {
         if (error) throw error;
         return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Database interview save failed, using local state:', err);
+        console.error('❌ Interview Database Save Error:', err);
+        return { success: false, error: err.message };
       }
     }
 
@@ -165,27 +180,31 @@ export const interviewDb = {
 
   // ৬. এডাপ্টিভ মেমোরি লোড করা (Load adaptive AI interview memory)
   getMemory: async (userId: string): Promise<InterviewMemory | null> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('interview_memories')
           .select('*')
-          .eq('userId', userId)
+          .eq('user_id', userId)
           .single();
 
         if (error) throw error;
         if (data) {
           return {
-            ...data,
-            weakTopics: typeof data.weakTopics === 'string' ? JSON.parse(data.weakTopics) : data.weakTopics,
-            strongTopics: typeof data.strongTopics === 'string' ? JSON.parse(data.strongTopics) : data.strongTopics,
-            previousQuestions: typeof data.previousQuestions === 'string' ? JSON.parse(data.previousQuestions) : data.previousQuestions,
-            previousMistakes: typeof data.previousMistakes === 'string' ? JSON.parse(data.previousMistakes) : data.previousMistakes,
-            improvementHistory: typeof data.improvementHistory === 'string' ? JSON.parse(data.improvementHistory) : data.improvementHistory,
-            learningSuggestions: typeof data.learningSuggestions === 'string' ? JSON.parse(data.learningSuggestions) : data.learningSuggestions,
-            studyPlan: typeof data.studyPlan === 'string' ? JSON.parse(data.studyPlan) : data.studyPlan,
+            id: data.id,
+            userId: data.user_id,
+            weakTopics: typeof data.weak_topics === 'string' ? JSON.parse(data.weak_topics) : data.weak_topics,
+            strongTopics: typeof data.strong_topics === 'string' ? JSON.parse(data.strong_topics) : data.strong_topics,
+            previousQuestions: typeof data.previous_questions === 'string' ? JSON.parse(data.previous_questions) : data.previous_questions,
+            previousMistakes: typeof data.previous_mistakes === 'string' ? JSON.parse(data.previous_mistakes) : data.previous_mistakes,
+            improvementHistory: typeof data.improvement_history === 'string' ? JSON.parse(data.improvement_history) : data.improvement_history,
+            learningSuggestions: typeof data.learning_suggestions === 'string' ? JSON.parse(data.learning_suggestions) : data.learning_suggestions,
+            readinessExplanation: data.readiness_explanation,
+            readinessScore: data.readiness_score,
+            studyPlan: typeof data.study_plan === 'string' ? JSON.parse(data.study_plan) : data.study_plan,
             metrics: typeof data.metrics === 'string' ? JSON.parse(data.metrics) : data.metrics,
-            aiInsights: typeof data.aiInsights === 'string' ? JSON.parse(data.aiInsights) : data.aiInsights,
+            aiInsights: typeof data.ai_insights === 'string' ? JSON.parse(data.ai_insights) : data.ai_insights,
+            lastUpdated: data.last_updated
           };
         }
         return null;
@@ -201,23 +220,23 @@ export const interviewDb = {
 
   // ৭. এডাপ্টিভ মেমোরি সংরক্ষণ করা (Save adaptive AI interview memory)
   saveMemory: async (memory: InterviewMemory): Promise<{ success: boolean; error: string | null }> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const row = {
           id: memory.id,
-          userId: memory.userId,
-          weakTopics: JSON.stringify(memory.weakTopics),
-          strongTopics: JSON.stringify(memory.strongTopics),
-          previousQuestions: JSON.stringify(memory.previousQuestions),
-          previousMistakes: JSON.stringify(memory.previousMistakes),
-          improvementHistory: JSON.stringify(memory.improvementHistory),
-          learningSuggestions: JSON.stringify(memory.learningSuggestions),
-          readinessExplanation: memory.readinessExplanation,
-          readinessScore: memory.readinessScore,
-          studyPlan: JSON.stringify(memory.studyPlan),
+          user_id: memory.userId,
+          weak_topics: JSON.stringify(memory.weakTopics),
+          strong_topics: JSON.stringify(memory.strongTopics),
+          previous_questions: JSON.stringify(memory.previousQuestions),
+          previous_mistakes: JSON.stringify(memory.previousMistakes),
+          improvement_history: JSON.stringify(memory.improvementHistory),
+          learning_suggestions: JSON.stringify(memory.learningSuggestions),
+          readiness_explanation: memory.readinessExplanation,
+          readiness_score: memory.readinessScore,
+          study_plan: JSON.stringify(memory.studyPlan),
           metrics: JSON.stringify(memory.metrics),
-          aiInsights: JSON.stringify(memory.aiInsights),
-          lastUpdated: memory.lastUpdated
+          ai_insights: JSON.stringify(memory.aiInsights),
+          last_updated: memory.lastUpdated
         };
 
         const { error } = await supabaseClient

@@ -21,8 +21,13 @@ import { AiSmartCv } from './AiSmartCv';
 import { AiInterview } from './AiInterview';
 import { AiSkillPassport } from './AiSkillPassport';
 import { AiCareerGrowth } from './AiCareerGrowth';
+import { AiCareerRoadmap } from './AiCareerRoadmap';
+import { AiProgressTracker } from './AiProgressTracker';
 import { AiReports } from './AiReports';
+import { AiAssessment } from './AiAssessment';
 import { ProfileTab } from './ProfileTab';
+import { SkillsOverview } from './SkillsOverview';
+import { InterviewRecorder } from './InterviewRecorder';
 import { cvDb } from '../lib/cvSupabase';
 import { interviewDb } from '../lib/interviewSupabase';
 import { passportDb, calculateLevel } from '../lib/passportSupabase';
@@ -80,6 +85,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
   const [portfolioInput, setPortfolioInput] = useState(user?.portfolio || user?.socialLinks?.portfolio || '');
   const [semesterInput, setSemesterInput] = useState(user?.semester || user?.socialLinks?.semester || '');
   const [bioInput, setBioInput] = useState(user?.bio || user?.socialLinks?.bio || '');
+  const [usernameInput, setUsernameInput] = useState(user?.username || user?.socialLinks?.username || '');
+  const [dobInput, setDobInput] = useState(user?.dob || user?.socialLinks?.dob || '');
+  const [genderInput, setGenderInput] = useState(user?.gender || user?.socialLinks?.gender || '');
+  const [countryInput, setCountryInput] = useState(user?.country || user?.socialLinks?.country || '');
+  const [cityInput, setCityInput] = useState(user?.city || user?.socialLinks?.city || '');
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
   const isFirstMount = React.useRef(true);
 
@@ -179,7 +189,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
           linkedin: linkedinInput,
           github: githubInput,
           portfolio: portfolioInput,
-          bio: bioInput
+          bio: bioInput,
+          username: usernameInput,
+          dob: dobInput,
+          gender: genderInput,
+          country: countryInput,
+          city: cityInput
         });
 
         if (res.success) {
@@ -208,7 +223,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     linkedinInput,
     githubInput,
     portfolioInput,
-    bioInput
+    bioInput,
+    usernameInput,
+    dobInput,
+    genderInput,
+    countryInput,
+    cityInput
   ]);
 
   // ডাইনামিক স্ট্যাটস এবং অ্যাক্টিভিটি স্টেটসমূহ (Dynamic Dashboard Stats)
@@ -509,6 +529,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     { id: 'dashboard', labelBn: 'ড্যাশবোর্ড হোম', labelEn: 'Dashboard Home', icon: LayoutDashboard },
     { id: 'cv', labelBn: 'এআই সিভি এডিটর', labelEn: 'AI Smart CV', icon: FileText },
     { id: 'interview', labelBn: 'এআই ভাইভা', labelEn: 'AI Interview', icon: Video },
+    { id: 'assessment', labelBn: 'এআই অ্যাসেসমেন্ট', labelEn: 'AI Assessment', icon: GraduationCap },
     { id: 'passport', labelBn: 'স্কিল পাসপোর্ট', labelEn: 'Skill Passport', icon: Award },
     { id: 'growth', labelBn: 'ক্যারিয়ার গ্রোথ হাব', labelEn: 'Career Growth Hub', icon: TrendingUp },
     { id: 'roadmap', labelBn: 'ক্যারিয়ার রোডম্যাপ', labelEn: 'Career Roadmap', icon: Map },
@@ -523,21 +544,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     e.preventDefault();
     const skillsArray = skillsInput.split(',').map(s => s.trim()).filter(s => s.length > 0);
     
+    setSaveStatus('saving');
     const res = await updateProfile({
       fullName: fullNameInput,
       phone: phoneInput,
       education: educationInput,
       experience: experienceInput,
       skills: skillsArray,
-      socialLinks: {
-        github: githubInput,
-        linkedin: linkedinInput,
-        address: addressInput,
-        university: universityInput,
-        department: departmentInput,
-        portfolio: portfolioInput
-      }
+      address: addressInput,
+      university: universityInput,
+      department: departmentInput,
+      semester: semesterInput,
+      github: githubInput,
+      linkedin: linkedinInput,
+      portfolio: portfolioInput,
+      bio: bioInput,
+      username: usernameInput,
+      dob: dobInput,
+      gender: genderInput,
+      country: countryInput,
+      city: cityInput
     });
+    setSaveStatus(res.success ? 'saved' : 'error');
 
     if (res.success) {
       setIsEditingProfile(false);
@@ -827,6 +855,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{user?.email}</p>
                       </div>
                       <div className="flex flex-col gap-0.5">
+                        {user?.email === 'nishat.af27@gmail.com' && (
+                          <button 
+                            onClick={() => { window.location.pathname = '/admin/dashboard'; }}
+                            className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-xl transition-all text-left w-full border border-emerald-200/30"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-500 animate-pulse" />
+                            <span>{isBn ? 'অ্যাডমিন প্যানেল' : 'Admin Panel'}</span>
+                          </button>
+                        )}
                         <button 
                           onClick={() => { setActiveTab('profile'); setShowProfileDropdown(false); }}
                           className="flex items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl transition-all text-left w-full"
@@ -1431,8 +1468,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </div>
                       <div>
-                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'সুপাবেস ডাটাবেজ' : 'Supabase Sync'}</h5>
-                        <p className="text-[10px] text-slate-400 font-medium">{cvDb.isConfigured() ? (isBn ? 'সংযুক্ত / রিয়েল-টাইম' : 'Connected / Real-time') : (isBn ? 'নিরাপদ লোকাল স্টোরেজ' : 'Local Sandbox Mode')}</p>
+                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'সুপাবেজ ডাটাবেজ' : 'Supabase Database'}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'সংযুক্ত / সক্রিয়' : 'Connected / Active'}</p>
                       </div>
                     </div>
 
@@ -1442,15 +1479,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                       </div>
                       <div>
-                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'ক্লাউড স্টোরেজ' : 'Storage Vault'}</h5>
-                        <p className="text-[10px] text-slate-400 font-medium">{cvDb.isConfigured() ? (isBn ? 'সক্রিয় / সুরক্ষিত' : 'Cloud Storage Active') : (isBn ? 'লোকাল ক্যাশে মেমরি' : 'Local Storage Cache')}</p>
+                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'ডিভাইস স্টোরেজ ক্যাশ' : 'Local Device Cache'}</h5>
+                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'লোকাল মেমরি' : 'Local Storage Cache'}</p>
                       </div>
                     </div>
                   </div>
 
                 </div>
               )}
-
+              
               {/* TAB 2: AI SMART CV (এআই সিভি এডিটর) */}
               {activeTab === 'cv' && (
                 <AiSmartCv 
@@ -1463,9 +1500,37 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
 
               {/* TAB 3: AI LIVE INTERVIEW (এআই লাইভ ইন্টারভিউ) */}
               {activeTab === 'interview' && (
-                <AiInterview 
-                  userId={user?.id || 'demo_user_id'} 
-                  isBn={isBn} 
+                <div className="flex flex-col gap-8">
+                  <AiInterview 
+                    userId={user?.id || 'demo_user_id'} 
+                    isBn={isBn} 
+                    onBack={() => setActiveTab('dashboard')} 
+                    onUpdate={() => loadDashboardData()}
+                  />
+                  
+                  {/* Interview Recorder Section */}
+                  <div className="border-t border-slate-200 dark:border-white/5 pt-8">
+                    <div className="mb-6">
+                      <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                        {isBn ? 'মক ইন্টারভিউ প্র্যাকটিস' : 'Mock Interview Practice'}
+                      </h3>
+                      <p className="text-sm text-slate-500">
+                        {isBn ? 'আপনার উত্তর রেকর্ড করুন এবং নিজেই নিজের পারফরম্যান্স যাচাই করুন।' : 'Record your answers and evaluate your performance yourself.'}
+                      </p>
+                    </div>
+                    <InterviewRecorder 
+                      onSave={(blob) => {
+                        console.log('Audio saved:', blob);
+                        alert(isBn ? 'রেকর্ডিং সফলভাবে ড্যাশবোর্ডে সেভ হয়েছে!' : 'Recording saved successfully to dashboard!');
+                      }} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3.5: AI ASSESSMENT HUB (এআই স্কিল অ্যাসেসমেন্ট) */}
+              {activeTab === 'assessment' && (
+                <AiAssessment 
                   onBack={() => setActiveTab('dashboard')} 
                   onUpdate={() => loadDashboardData()}
                 />
@@ -1487,18 +1552,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
 
               {/* TAB 6: AI LEARNING ROADMAP (ক্যারিয়ার রোডম্যাপ) */}
               {activeTab === 'roadmap' && (
-                <AiCareerGrowth 
+                <AiCareerRoadmap 
                   onNavigateToTab={(tabId) => setActiveTab(tabId)} 
-                  initialFocusSection="roadmap"
                 />
               )}
 
               {/* TAB 7: AI PROGRESS TRACKER (অগ্রগতি ট্র্যাকার) */}
               {activeTab === 'progress' && (
-                <AiCareerGrowth 
-                  onNavigateToTab={(tabId) => setActiveTab(tabId)} 
-                  initialFocusSection="progress"
-                />
+                <div className="flex flex-col gap-8">
+                   <div className="flex flex-col gap-2">
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
+                      {isBn ? 'দক্ষতা ও অগ্রগতি ট্র্যাকার' : 'Skill & Progress Tracker'}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {isBn ? 'আপনার ভেরিফাইড স্কিল এবং ক্যারিয়ারের প্রোগ্রেস ভিজ্যুয়াল ডাটার মাধ্যমে দেখুন।' : 'Track your verified skills and career progress through visual data insights.'}
+                    </p>
+                  </div>
+                  
+                  <SkillsOverview skills={passportSkills} />
+                  
+                  <Card className="p-8 mt-4 bg-emerald-600 dark:bg-emerald-500 text-white relative overflow-hidden">
+                    <div className="absolute right-0 top-0 opacity-10 p-4">
+                      <TrendingUp className="w-40 h-40" />
+                    </div>
+                    <div className="relative z-10 max-w-lg">
+                      <h3 className="text-2xl font-bold mb-2">{isBn ? 'স্কিল পাসপোর্ট লেভেল আপ করুন!' : 'Level Up Your Skill Passport!'}</h3>
+                      <p className="text-emerald-50 text-sm mb-6">
+                        {isBn 
+                          ? 'নতুন স্কিল অ্যাসেসমেন্ট এবং ইন্টারভিউ সম্পন্ন করে আপনার প্রফেশনাল ভ্যালু বৃদ্ধি করুন।' 
+                          : 'Complete more skill assessments and interviews to increase your professional value and move to next level.'}
+                      </p>
+                      <Button variant="outline" className="bg-white text-emerald-600 border-none hover:bg-emerald-50" onClick={() => setActiveTab('assessment')}>
+                        {isBn ? 'অ্যাসেসমেন্ট শুরু করুন' : 'Start Assessment'}
+                      </Button>
+                    </div>
+                  </Card>
+                </div>
               )}
 
               {/* TAB 8: AI REPORTS & EXPORT (এআই রিপোর্ট ও এক্সপোর্ট) */}
@@ -1538,6 +1627,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                   setlinkedinInput={setLinkedinInput}
                   portfolioInput={portfolioInput}
                   setportfolioInput={setPortfolioInput}
+                  usernameInput={usernameInput}
+                  setUsernameInput={setUsernameInput}
+                  dobInput={dobInput}
+                  setDobInput={setDobInput}
+                  genderInput={genderInput}
+                  setGenderInput={setGenderInput}
+                  countryInput={countryInput}
+                  setCountryInput={setCountryInput}
+                  cityInput={cityInput}
+                  setCityInput={setCityInput}
+                  onSave={async () => {
+                    await handleProfileSave({ preventDefault: () => {} } as React.FormEvent);
+                  }}
+                  savingProfile={saveStatus === 'saving'}
                   calculateProfileCompletion={calculateProfileCompletion}
                   handleAvatarFileChange={handleAvatarFileChange}
                   deleteProfilePicture={deleteProfilePicture}

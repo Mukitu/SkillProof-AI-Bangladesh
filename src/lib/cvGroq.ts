@@ -50,22 +50,26 @@ Generate a highly professional, compelling, and action-oriented 3-4 sentence Car
 
 The summary must focus on impact, specific achievements, and professional value. Respond ONLY with the raw text of the summary. Do not include any intro, quotes, or markdown wrappers. Write it in English.`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const chatCompletion = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
-          temperature: 0.7,
-          max_tokens: 250,
-        });
-        const content = chatCompletion.choices[0]?.message?.content;
-        if (content) return content.trim();
-      } catch (err) {
-        console.error('Groq AI Assist summary failed:', err);
-        throw err;
-      }
+          temperature: 0.7
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      if (content) return content.trim();
+      throw new Error('No content returned from AI');
+    } catch (err) {
+      console.error('Groq AI Assist summary failed:', err);
+      throw err;
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ২. ডেসক্রিপশন ইম্প্রুভ করা (Improve Work/Project Description)
@@ -80,22 +84,26 @@ Original text:
 
 Respond ONLY with the rewritten text. Do not write intro, explanation, or markdown formatting. Output in English.`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const chatCompletion = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
-          temperature: 0.6,
-          max_tokens: 300,
-        });
-        const content = chatCompletion.choices[0]?.message?.content;
-        if (content) return content.trim();
-      } catch (err) {
-        console.error('Groq AI Improve description failed:', err);
-        throw err;
-      }
+          temperature: 0.6
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      if (content) return content.trim();
+      throw new Error('No content returned from AI');
+    } catch (err) {
+      console.error('Groq AI Improve description failed:', err);
+      throw err;
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৩. আপলোড করা সিভি ফাইল এনালাইসিস করা (Analyze & Extract CV File Content)
@@ -172,32 +180,37 @@ RESPONSE FORMAT (Strict JSON):
 
 Respond ONLY with the raw JSON object.`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const chatCompletion = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
-          temperature: 0.3, // low temperature for structured output accuracy
-          max_tokens: 1800,
-        });
-        const content = chatCompletion.choices[0]?.message?.content;
-        if (content) {
-          // র অবজেক্ট ক্লিন করা (Clean markdown wrappers if present)
-          let cleanJson = content.trim();
-          if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-          }
-          const result = JSON.parse(cleanJson);
-          if (result.scores && result.feedback) {
-            return result;
-          }
+          temperature: 0.3,
+          max_tokens: 1800
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      
+      if (content) {
+        // র অবজেক্ট ক্লিন করা (Clean markdown wrappers if present)
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
-        throw new Error('Invalid JSON format from AI');
-      } catch (err: any) {
-        console.error('Groq CV Analysis failed:', err);
-        throw new Error('Failed to analyze CV using AI: ' + err.message);
+        const result = JSON.parse(cleanJson);
+        if (result.scores && result.feedback) {
+          return result;
+        }
       }
+      throw new Error('Invalid JSON format from AI');
+    } catch (err: any) {
+      console.error('Groq CV Analysis failed:', err);
+      throw new Error('Failed to analyze CV using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   }
 };

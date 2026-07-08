@@ -12,6 +12,11 @@ export interface SkillPassport {
   readinessScore: number;
   level: 'Beginner' | 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Expert';
   verificationStatus: 'Verified' | 'Pending' | 'Unverified';
+  resumeScore?: number;
+  atsScore?: number;
+  interviewScore?: number;
+  summary?: string;
+  qrCodeUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

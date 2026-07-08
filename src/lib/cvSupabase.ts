@@ -42,31 +42,37 @@ export const cvDb = {
 
   // ২. সব সিভি ডাটা লোড করা (Get all CV entries for a user)
   getResumes: async (userId: string): Promise<CvData[]> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('cv_resumes')
           .select('*')
-          .eq('userId', userId)
+          .eq('user_id', userId)
           .order('updatedAt', { ascending: false });
 
         if (error) throw error;
         if (data) {
-          // সুপাবেজে প্রতি সারিতে JSON আকারে সম্পূর্ণ অবজেক্টও থাকতে পারে
           return data.map((item: any) => ({
-            ...item,
-            personalInfo: typeof item.personalInfo === 'string' ? JSON.parse(item.personalInfo) : item.personalInfo,
-            education: typeof item.education === 'string' ? JSON.parse(item.education) : item.education,
-            experience: typeof item.experience === 'string' ? JSON.parse(item.experience) : item.experience,
-            projects: typeof item.projects === 'string' ? JSON.parse(item.projects) : item.projects,
-            skills: typeof item.skills === 'string' ? JSON.parse(item.skills) : item.skills,
-            scores: typeof item.scores === 'string' ? JSON.parse(item.scores) : item.scores,
-            feedback: typeof item.feedback === 'string' ? JSON.parse(item.feedback) : item.feedback,
+            id: item.id,
+            userId: item.user_id,
+            personalInfo: item.personalInfo,
+            careerSummary: item.careerSummary,
+            improvedCareerSummary: item.improvedCareerSummary,
+            education: item.education,
+            experience: item.experience,
+            projects: item.projects,
+            skills: item.skills,
+            templateId: item.templateId,
+            isAnalyzed: item.isAnalyzed,
+            scores: item.scores,
+            feedback: item.feedback,
+            createdAt: item.createdAt,
+            updatedAt: item.updatedAt
           }));
         }
         return [];
       } catch (err: any) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        console.error('❌ CV Database Fetch Error:', err.message || err);
       }
     }
 
@@ -78,26 +84,33 @@ export const cvDb = {
 
   // ৩. সিঙ্গেল সিভি লোড করা (Get single CV by ID)
   getResumeById: async (id: string, userId: string): Promise<CvData | null> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('cv_resumes')
           .select('*')
           .eq('id', id)
-          .eq('userId', userId)
+          .eq('user_id', userId)
           .single();
 
         if (error) throw error;
         if (data) {
           return {
-            ...data,
-            personalInfo: typeof data.personalInfo === 'string' ? JSON.parse(data.personalInfo) : data.personalInfo,
-            education: typeof data.education === 'string' ? JSON.parse(data.education) : data.education,
-            experience: typeof data.experience === 'string' ? JSON.parse(data.experience) : data.experience,
-            projects: typeof data.projects === 'string' ? JSON.parse(data.projects) : data.projects,
-            skills: typeof data.skills === 'string' ? JSON.parse(data.skills) : data.skills,
-            scores: typeof data.scores === 'string' ? JSON.parse(data.scores) : data.scores,
-            feedback: typeof data.feedback === 'string' ? JSON.parse(data.feedback) : data.feedback,
+            id: data.id,
+            userId: data.user_id,
+            personalInfo: data.personalInfo,
+            careerSummary: data.careerSummary,
+            improvedCareerSummary: data.improvedCareerSummary,
+            education: data.education,
+            experience: data.experience,
+            projects: data.projects,
+            skills: data.skills,
+            templateId: data.templateId,
+            isAnalyzed: data.isAnalyzed,
+            scores: data.scores,
+            feedback: data.feedback,
+            createdAt: data.createdAt,
+            updatedAt: data.updatedAt
           };
         }
         return null;
@@ -118,24 +131,23 @@ export const cvDb = {
       updatedAt: new Date().toISOString()
     };
 
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
-        // সুপাবেজের জন্য ডাটাবেজ অবজেক্ট ফরম্যাট (Prepare database row)
         const row = {
           id: updatedCv.id,
-          userId: updatedCv.userId,
-          personalInfo: JSON.stringify(updatedCv.personalInfo),
+          user_id: updatedCv.userId,
+          personalInfo: updatedCv.personalInfo,
           careerSummary: updatedCv.careerSummary,
           improvedCareerSummary: updatedCv.improvedCareerSummary || null,
-          education: JSON.stringify(updatedCv.education),
-          experience: JSON.stringify(updatedCv.experience),
-          projects: JSON.stringify(updatedCv.projects),
-          skills: JSON.stringify(updatedCv.skills),
+          education: updatedCv.education,
+          experience: updatedCv.experience,
+          projects: updatedCv.projects,
+          skills: updatedCv.skills,
           templateId: updatedCv.templateId,
           createdAt: updatedCv.createdAt,
           updatedAt: updatedCv.updatedAt,
-          scores: updatedCv.scores ? JSON.stringify(updatedCv.scores) : null,
-          feedback: updatedCv.feedback ? JSON.stringify(updatedCv.feedback) : null,
+          scores: updatedCv.scores || null,
+          feedback: updatedCv.feedback || null,
           isAnalyzed: updatedCv.isAnalyzed || false
         };
 
@@ -146,7 +158,8 @@ export const cvDb = {
         if (error) throw error;
         return { success: true, error: null };
       } catch (err: any) {
-        console.warn('⚠️ Database save operation failed, using local state:', err);
+        console.error('❌ CV Database Save Error:', err);
+        return { success: false, error: err.message };
       }
     }
 

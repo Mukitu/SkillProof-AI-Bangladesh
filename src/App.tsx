@@ -12,6 +12,7 @@ import { Dashboard } from './components/Dashboard';
 import { LoadingSpinner } from './components/UI';
 import { PublicPassportPage } from './components/PublicPassportPage';
 import { VerificationPage } from './components/VerificationPage';
+import { AdminPanel } from './components/AdminPanel';
 
 // অভ্যন্তরীণ রাউটিং উইজেট (Inner Routing Widget with access to useAuth)
 function MainRouter() {
@@ -22,13 +23,20 @@ function MainRouter() {
 
   // ইউআরএল পাথ পার্স করা (Parse URL path for public passport and verification routes)
   const path = window.location.pathname;
+  
+  if (path.startsWith('/admin')) {
+    return <AdminPanel />;
+  }
+  
   if (path.startsWith('/passport/')) {
     const passportId = path.split('/')[2];
     return <PublicPassportPage passportId={passportId} />;
   }
+  
   if (path.startsWith('/verify/')) {
-    const verificationId = path.split('/')[2];
-    return <VerificationPage verificationId={verificationId} />;
+    const id = path.split('/')[2];
+    // If it starts with SP-BD, it's a full passport verification
+    return <VerificationPage verificationId={id} />;
   }
 
   let initialTab = 'dashboard';

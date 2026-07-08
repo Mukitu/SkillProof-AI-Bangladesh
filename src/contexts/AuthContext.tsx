@@ -37,8 +37,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentUser = await mockAuth.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
-          const userSettings = await mockDb.getSettingsByUserId(currentUser.id);
-          setSettings(userSettings);
+          try {
+            const userSettings = await mockDb.getSettingsByUserId(currentUser.id);
+            setSettings(userSettings);
+          } catch (e) {
+            console.error('Failed to load settings on init, using defaults', e);
+            setSettings({ userId: currentUser.id, language: 'bn', theme: 'dark', notificationsEnabled: true, marketingEmails: false });
+          }
         }
       } catch (err) {
         console.error('অথেনটিকেশন ইনিশিয়ালাইজেশন ত্রুটি:', err);
@@ -52,18 +57,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // লগইন হ্যান্ডলার (Login handler)
   const login = async (email: string, password?: string) => {
     setLoading(true);
-    const { data, error } = await mockAuth.signIn(email, password);
-    if (error) {
+    try {
+      const { data, error } = await mockAuth.signIn(email, password);
+      if (error) {
+        setLoading(false);
+        return { success: false, error: error.message };
+      }
+      if (data.user) {
+        setUser(data.user);
+        try {
+          const userSettings = await mockDb.getSettingsByUserId(data.user.id);
+          setSettings(userSettings);
+        } catch (e) {
+          console.error('Failed to load settings on login, using defaults', e);
+          setSettings({ userId: data.user.id, language: 'bn', theme: 'dark', notificationsEnabled: true, marketingEmails: false });
+        }
+      }
       setLoading(false);
-      return { success: false, error: error.message };
+      return { success: true, error: null };
+    } catch (err: any) {
+      setLoading(false);
+      return { success: false, error: err.message || 'An unexpected error occurred during login.' };
     }
-    if (data.user) {
-      setUser(data.user);
-      const userSettings = await mockDb.getSettingsByUserId(data.user.id);
-      setSettings(userSettings);
-    }
-    setLoading(false);
-    return { success: true, error: null };
   };
 
   // সাইনআপ হ্যান্ডলার (Signup handler)
@@ -146,8 +161,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     if (data?.user) {
       setUser(data.user);
-      const userSettings = await mockDb.getSettingsByUserId(data.user.id);
-      setSettings(userSettings);
+      try {
+        const userSettings = await mockDb.getSettingsByUserId(data.user.id);
+        setSettings(userSettings);
+      } catch (e) {
+        console.error('Failed to load settings on OTP verify, using defaults', e);
+        setSettings({ userId: data.user.id, language: 'bn', theme: 'dark', notificationsEnabled: true, marketingEmails: false });
+      }
     }
     setLoading(false);
     return { success: true, error: null };

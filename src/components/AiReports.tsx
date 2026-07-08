@@ -9,13 +9,21 @@ import {
   Search, Download, Award, FileText, Video, TrendingUp, Printer, 
   Share2, Copy, ExternalLink, Calendar, ArrowUpDown, Clock, 
   ArrowUpRight, BarChart3, CheckCircle2, AlertCircle, Sparkles, 
-  Cpu, Check, History, X, ChevronRight, FileDown, ShieldAlert
+  Cpu, Check, History, X, ChevronRight, FileDown, ShieldAlert, Trash2
 } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge } from './UI';
 import { reportsDb } from '../lib/reportsSupabase';
+import { cvDb } from '../lib/cvSupabase';
+import { interviewDb } from '../lib/interviewSupabase';
+import { passportDb } from '../lib/passportSupabase';
+import { roadmapDb } from '../lib/roadmapSupabase';
+import { progressDb } from '../lib/progressSupabase';
 import { AiReport, DownloadHistory, ReportType } from '../types/reports';
+import { 
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip 
+} from 'recharts';
 
 interface AiReportsProps {
   onNavigateToTab?: (tabId: string) => void;
@@ -35,9 +43,194 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
   const [selectedDateFilter, setSelectedDateFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [generatingOverall, setGeneratingOverall] = useState(false);
 
   // ক্যানভাস রেফারেন্স ফর ডাউনলোড পিএনজি (Canvas Ref for PNG generation)
   const cardCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // এআই সার্বিক ক্যারিয়ার এনালাইসিস বাটন লজিক (AI Overall Career Report generation with Groq)
+  const handleGenerateOverallReport = async () => {
+    if (!user) return;
+    setGeneratingOverall(true);
+    try {
+      const resumes = await cvDb.getResumes(user.id);
+      const interviews = await interviewDb.getSessions(user.id);
+      const skills = await passportDb.getSkillsByUserId(user.id);
+      const passport = await passportDb.getPassportByUserId(user.id);
+      const roadmaps = await roadmapDb.getRoadmaps(user.id);
+      const progress = await progressDb.getProgress(user.id);
+
+      const prompt = `You are an elite enterprise AI Career Architect in Bangladesh.
+Your task is to analyze the user's real profile, CV analytics, interview sessions, skill passports, roadmap progress, and career tracking metrics to generate a comprehensive, highly personalized Overall Career Summary Report.
+
+Use ONLY the provided real data. Do not hallucinate or add any placeholder fields.
+User Profile:
+Name: ${user.fullName || 'User'}
+Education: ${user.education || 'N/A'}
+Experience: ${user.experience || 'N/A'}
+Target Career: ${passport?.careerPath || 'Software/Technical Engineering'}
+
+CV Analytics (Resume Analysis):
+${JSON.stringify(resumes.map(r => ({
+  scores: r.scores,
+  feedback: r.feedback,
+  skills: r.skills
+})))}
+
+Interview History (Viva evaluations):
+${JSON.stringify(interviews.map(i => ({
+  careerPath: i.careerPath,
+  scores: i.scores,
+  feedback: i.feedback
+})))}
+
+Verified Skills:
+${JSON.stringify(skills.map(s => ({
+  name: s.skillName,
+  level: s.level,
+  score: s.score
+})))}
+
+Career Roadmap:
+${JSON.stringify(roadmaps.map(r => ({
+  targetCareer: r.targetCareer,
+  phasesCount: r.phases?.length
+})))}
+
+Generate an extensive response in JSON format. The response must be a single JSON object.
+You MUST respond with a JSON object ONLY, formatted EXACTLY according to the schema below. Do not wrap the JSON in markdown code blocks, and do not include any other text.
+
+Schema:
+{
+  "summary": "Detailed paragraph explaining overall career status and preparedness",
+  "strengths": ["list of 3 key professional strengths found from data"],
+  "weaknesses": ["list of 3 critical improvement areas"],
+  "readinessScore": number (0 to 100 based on achievements),
+  "missingSkills": ["list of technical skills missing from the resume but highly requested"],
+  "priorityLearningAreas": ["list of priority areas the user should immediately learn"],
+  "suggestedNextSteps": ["list of immediate action steps for career growth"],
+  "recommendedCertifications": ["list of industry certifications recommended for this role"],
+  "recommendedPortfolioProjects": ["list of high-impact portfolio projects they should build"],
+  "recommendedInterviewPrep": ["list of interview prep focus topics to practice"]
+}`;
+
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.3,
+          max_tokens: 3000
+        })
+      });
+
+      if (!response.ok) throw new Error('Groq Proxy API error');
+      const apiResult = await response.json();
+      const content = apiResult.choices?.[0]?.message?.content;
+      
+      if (content) {
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        }
+        const data = JSON.parse(cleanJson);
+
+        const reportId = `rep_overall_${user.id}`;
+        const newReport: AiReport = {
+          id: reportId,
+          userId: user.id,
+          type: 'overall_career',
+          titleBn: 'সার্বিক ক্যারিয়ার ওভারভিউ ও এআই বিশ্লেষণ',
+          titleEn: 'Overall Career Overview & AI Analysis',
+          createdAt: new Date().toISOString(),
+          data: {
+            summary: data.summary,
+            strengths: data.strengths || [],
+            weaknesses: data.weaknesses || [],
+            readinessScore: data.readinessScore || passport?.readinessScore || 70,
+            missingSkills: data.missingSkills || [],
+            priorityLearningAreas: data.priorityLearningAreas || [],
+            suggestedNextSteps: data.suggestedNextSteps || [],
+            recommendedCertifications: data.recommendedCertifications || [],
+            recommendedPortfolioProjects: data.recommendedPortfolioProjects || [],
+            recommendedInterviewPrep: data.recommendedInterviewPrep || [],
+            generatedDate: new Date().toISOString()
+          }
+        };
+
+        await reportsDb.saveReport(newReport);
+        await loadData();
+        setActiveReport(newReport);
+      }
+    } catch (err) {
+      console.error('Failed to generate overall report:', err);
+    } finally {
+      setGeneratingOverall(false);
+    }
+  };
+
+  // ডাউনলোড রিসিভড ডেটা JSON আকারে
+  const handleDownloadJSON = (report: AiReport) => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(report, null, 2));
+    const a = document.createElement('a');
+    a.setAttribute("href", dataStr);
+    a.setAttribute("download", `SPAI-Report-${report.id}.json`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    if (user) {
+      reportsDb.addDownloadHistory(user.id, `${report.titleEn}.json`, 'JSON', 'Completed');
+      loadData();
+    }
+  };
+
+  // ডাউনলোড রিসিভড ডেটা CSV আকারে
+  const handleDownloadCSV = (report: AiReport) => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Field,Value\n";
+    csvContent += `Report ID,${report.id}\n`;
+    csvContent += `Title,${report.titleEn}\n`;
+    csvContent += `Date,${new Date(report.createdAt).toLocaleDateString()}\n`;
+    csvContent += `Type,${report.type}\n`;
+    
+    const data = report.data as any;
+    Object.keys(data).forEach(key => {
+      const val = data[key];
+      if (Array.isArray(val)) {
+        csvContent += `"${key}","${val.join('; ')}"\n`;
+      } else if (typeof val === 'object') {
+        csvContent += `"${key}","${JSON.stringify(val).replace(/"/g, '""')}"\n`;
+      } else {
+        csvContent += `"${key}","${val}"\n`;
+      }
+    });
+
+    const encodedUri = encodeURI(csvContent);
+    const a = document.createElement('a');
+    a.setAttribute("href", encodedUri);
+    a.setAttribute("download", `SPAI-Report-${report.id}.csv`);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    if (user) {
+      reportsDb.addDownloadHistory(user.id, `${report.titleEn}.csv`, 'CSV', 'Completed');
+      loadData();
+    }
+  };
+
+  // রিপোর্ট ডিলিট করা
+  const handleDeleteReport = async (reportId: string) => {
+    if (window.confirm(isBn ? 'আপনি কি এই রিপোর্টটি মুছে ফেলতে চান?' : 'Are you sure you want to delete this report?')) {
+      const success = await reportsDb.deleteReport(reportId);
+      if (success) {
+        setActiveReport(null);
+        await loadData();
+      }
+    }
+  };
 
   // ডাটা লোড করা (Load report and download history)
   const loadData = async () => {
@@ -262,6 +455,64 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
     return reports.filter(r => r.type === 'interview').length;
   };
 
+  const getChartData = () => {
+    const dataPoints: { name: string; score: number }[] = [];
+    const interviewReps = reports.filter(r => r.type === 'interview').slice().reverse();
+    const resumeReps = reports.filter(r => r.type === 'resume').slice().reverse();
+    const passportReps = reports.filter(r => r.type === 'passport').slice().reverse();
+
+    if (resumeReps.length > 0) {
+      resumeReps.forEach((r, i) => {
+        dataPoints.push({
+          name: `${isBn ? 'সিভি' : 'CV'} #${i + 1}`,
+          score: (r.data as any).resumeScore || 70
+        });
+      });
+    }
+    if (interviewReps.length > 0) {
+      interviewReps.forEach((r, i) => {
+        dataPoints.push({
+          name: `${isBn ? 'ভাইভা' : 'Viva'} #${i + 1}`,
+          score: (r.data as any).overallScore || 70
+        });
+      });
+    }
+    if (passportReps.length > 0) {
+      passportReps.forEach((r, i) => {
+        dataPoints.push({
+          name: `${isBn ? 'পাসপোর্ট' : 'Passport'} #${i + 1}`,
+          score: (r.data as any).readinessScore || 70
+        });
+      });
+    }
+
+    if (dataPoints.length === 0) {
+      return [
+        { name: isBn ? 'শুরু' : 'Start', score: 40 },
+        { name: isBn ? 'বর্তমান' : 'Current', score: 60 }
+      ];
+    }
+    return dataPoints.slice(-6);
+  };
+
+  const getRadarData = () => {
+    const latestResume = reports.find(r => r.type === 'resume');
+    const latestInterview = reports.find(r => r.type === 'interview');
+    const latestPassport = reports.find(r => r.type === 'passport');
+
+    const techScore = latestInterview ? ((latestInterview.data as any).technical || 70) : 60;
+    const commScore = latestInterview ? ((latestInterview.data as any).communication || 70) : 65;
+    const atsScore = latestResume ? ((latestResume.data as any).atsScore || 75) : 55;
+    const readinessScore = latestPassport ? ((latestPassport.data as any).readinessScore || 70) : 60;
+
+    return [
+      { subject: isBn ? 'টেকনিক্যাল' : 'Technical', value: techScore },
+      { subject: isBn ? 'যোগাযোগ' : 'Communication', value: commScore },
+      { subject: isBn ? 'এটিএস ফিট' : 'ATS Fit', value: atsScore },
+      { subject: isBn ? 'ক্যারিয়ার রেডিনেস' : 'Readiness', value: readinessScore }
+    ];
+  };
+
   // সার্চ এবং ফিল্টারিং লজিক (Search, filter and sort reports)
   const filteredReports = reports.filter(r => {
     // সার্চ ফিল্টার
@@ -337,17 +588,33 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
           </p>
         </div>
         
-        {/* অ্যাকশন বাটন */}
-        {onNavigateToTab && (
-          <Button 
-            variant="brand" 
-            onClick={() => onNavigateToTab('interview')}
-            className="flex items-center gap-2 shadow-lg hover:shadow-brand-green/10"
+        {/* অ্যাকশন বাটনসমূহ */}
+        <div className="flex flex-col sm:flex-row gap-3 relative z-10 w-full md:w-auto">
+          <Button
+            variant="brand"
+            onClick={handleGenerateOverallReport}
+            disabled={generatingOverall}
+            className="flex items-center justify-center gap-2 relative overflow-hidden group shadow-lg hover:shadow-brand-green/20"
           >
-            <Video className="w-4 h-4" />
-            <span>{isBn ? 'নতুন ভাইভা পরীক্ষা দিন' : 'Take a New Viva'}</span>
+            <Sparkles className={`w-4 h-4 ${generatingOverall ? 'animate-spin' : 'group-hover:animate-bounce'}`} />
+            <span>
+              {generatingOverall 
+                ? (isBn ? 'এআই বিশ্লেষণ চলছে...' : 'AI Analyzing...') 
+                : (isBn ? 'এআই ক্যারিয়ার সামারি' : 'AI Career Summary')}
+            </span>
           </Button>
-        )}
+
+          {onNavigateToTab && (
+            <Button 
+              variant="secondary" 
+              onClick={() => onNavigateToTab('interview')}
+              className="flex items-center justify-center gap-2 bg-slate-900 border border-white/5 hover:bg-slate-800 text-white"
+            >
+              <Video className="w-4 h-4 text-brand-green" />
+              <span>{isBn ? 'নতুন ভাইভা পরীক্ষা' : 'Take a New Viva'}</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* ২. রিপোর্ট ড্যাশবোর্ড ওভারভিউ স্ট্যাটস (REPORT DASHBOARD SUMMARY) */}
@@ -401,6 +668,67 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
         </Card>
       </div>
 
+      {/* এআই অ্যানালিটিক্স ড্যাশবোর্ড গ্রাফস (AI Analytics Dashboard Charts) */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* ১. ক্যারিয়ার রেডিনেস ও অ্যাক্টিভিটি ট্রেন্ড (Area Chart) */}
+        <Card className="p-6 bg-slate-900 border-white/5 relative overflow-hidden flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <TrendingUp className="w-4 h-4 text-brand-green" />
+              <span>{isBn ? 'দক্ষতা ও ক্যারিয়ার স্কোর ট্রেন্ড' : 'Readiness & Activity Trend'}</span>
+            </h3>
+            <Badge variant="outline" className="text-slate-400 border-white/10 text-[10px]">Real-Time Sync</Badge>
+          </div>
+          <div className="h-60 w-full font-sans">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={getChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#22C55E" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#22C55E" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <XAxis dataKey="name" stroke="#64748B" fontSize={10} />
+                <YAxis stroke="#64748B" fontSize={10} domain={[0, 100]} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0F172A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  labelStyle={{ color: '#94A3B8', fontSize: '11px', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F8FAFC', fontSize: '11px' }}
+                />
+                <Area type="monotone" dataKey="score" stroke="#22C55E" strokeWidth={2} fillOpacity={1} fill="url(#colorScore)" name={isBn ? 'স্কোর' : 'Score'} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        {/* ২. স্কিল ক্যাটাগরি ডিস্ট্রিবিউশন (Radar / Bar Chart) */}
+        <Card className="p-6 bg-slate-900 border-white/5 relative overflow-hidden flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+              <BarChart3 className="w-4 h-4 text-brand-blue" />
+              <span>{isBn ? 'প্রধান ৪টি মূল্যায়ন মাত্রা' : 'Core Evaluation Pillars'}</span>
+            </h3>
+            <Badge variant="outline" className="text-slate-400 border-white/10 text-[10px]">AI Evaluated</Badge>
+          </div>
+          <div className="h-60 w-full font-sans">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={getRadarData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" />
+                <XAxis dataKey="subject" stroke="#64748B" fontSize={10} />
+                <YAxis stroke="#64748B" fontSize={10} domain={[0, 100]} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0F172A', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '12px' }}
+                  labelStyle={{ color: '#94A3B8', fontSize: '11px', fontWeight: 'bold' }}
+                  itemStyle={{ color: '#F8FAFC', fontSize: '11px' }}
+                />
+                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} name={isBn ? 'দক্ষতার হার' : 'Pillar Score'} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
       {/* ৩. সার্চ এবং ফিল্টার কন্ট্রোল (Search and Filter controls) */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-slate-900 border border-white/5 rounded-2xl shadow-md">
         <div className="relative w-full md:w-80">
@@ -427,6 +755,8 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
             <option value="passport">{isBn ? 'স্কিল পাসপোর্ট' : 'Skill Passport'}</option>
             <option value="growth">{isBn ? 'ক্যারিয়ার গ্রোথ' : 'Career Growth'}</option>
             <option value="improvement">{isBn ? 'উন্নতি ট্র্যাকিং' : 'Improvement Tracking'}</option>
+            <option value="roadmap">{isBn ? 'ক্যারিয়ার রোডম্যাপ' : 'Career Roadmap'}</option>
+            <option value="overall_career">{isBn ? 'সার্বিক ক্যারিয়ার এনালাইসিস' : 'Overall Career Summary'}</option>
           </select>
 
           {/* ডেট ফিল্টার */}
@@ -487,7 +817,8 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                   const Icon = report.type === 'resume' ? FileText :
                              report.type === 'interview' ? Video :
                              report.type === 'passport' ? Award :
-                             report.type === 'growth' ? TrendingUp : BarChart3;
+                             report.type === 'growth' ? TrendingUp :
+                             report.type === 'roadmap' ? ArrowUpRight : BarChart3;
                   
                   return (
                     <motion.div
@@ -517,7 +848,7 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                           <div className="flex items-center gap-1.5 mb-4">
                             <span className="h-1.5 w-1.5 rounded-full bg-brand-green animate-pulse" />
                             <span className="text-[11px] text-slate-400 capitalize">
-                              {report.type} {isBn ? 'রিপোর্ট' : 'Report'}
+                              {report.type === 'overall_career' ? (isBn ? 'সার্বিক ক্যারিয়ার' : 'Overall Career') : report.type} {isBn ? 'রিপোর্ট' : 'Report'}
                             </span>
                           </div>
                         </div>
@@ -532,7 +863,7 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                             <ChevronRight className="w-3.5 h-3.5" />
                           </Button>
                           
-                          <div className="grid grid-cols-3 gap-1">
+                          <div className="grid grid-cols-4 gap-1">
                             <button
                               onClick={() => handleCopyLink(report)}
                               title="Copy Link"
@@ -556,6 +887,14 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                             >
                               <Award className="w-3.5 h-3.5" />
                               <span>QR</span>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteReport(report.id)}
+                              title="Delete Report"
+                              className="p-2 rounded-lg bg-slate-800 hover:bg-red-500/10 text-slate-300 hover:text-red-400 text-[10px] flex items-center justify-center gap-1"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Del</span>
                             </button>
                           </div>
                         </div>
@@ -1031,6 +1370,174 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                   </div>
                 )}
 
+                {/* চ. ক্যারিয়ার রোডম্যাপ রিপোর্ট (CAREER ROADMAP REPORT VIEW) */}
+                {activeReport.type === 'roadmap' && (
+                  <div className="flex flex-col gap-6">
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                      <div className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                          <span className="text-xs text-slate-500 block mb-0.5">{isBn ? 'ক্যারিয়ার পাথ' : 'Target Career Path'}</span>
+                          <span className="text-md font-bold text-white">{(activeReport.data as any).targetCareer}</span>
+                        </div>
+                        <div>
+                          <span className="text-xs text-slate-500 block mb-0.5">{isBn ? 'আনুমানিক সমাপ্তি সময়কাল' : 'Estimated Duration'}</span>
+                          <span className="text-sm text-brand-green font-bold">{(activeReport.data as any).estimatedCompletion || '6 Months'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                      <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-1.5">
+                        <TrendingUp className="w-4 h-4 text-brand-green" />
+                        <span>{isBn ? 'রোডম্যাপ মাইলস্টোন ধাপসমূহ' : 'Roadmap Phases & Milestones'}</span>
+                      </h4>
+                      <div className="space-y-6 relative before:absolute before:left-3 before:top-2 before:bottom-2 before:w-[1px] before:bg-brand-green/20">
+                        {((activeReport.data as any).phases || []).map((phase: any, pIdx: number) => (
+                          <div key={pIdx} className="flex gap-4 pl-8 relative">
+                            <span className={`absolute left-1.5 top-1.5 w-3 h-3 rounded-full border-2 ${phase.status === 'Completed' ? 'bg-brand-green border-brand-green' : 'bg-slate-900 border-slate-700'}`} />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h5 className="text-xs font-bold text-white">{phase.title}</h5>
+                                <Badge variant="brand" className="text-[9px] uppercase">{phase.status}</Badge>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mb-2">{phase.description}</p>
+                              
+                              {phase.skills && phase.skills.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                  {phase.skills.map((sk: string, sIdx: number) => (
+                                    <Badge key={sIdx} variant="outline" className="text-[9px] text-slate-300 border-white/5">{sk}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                              
+                              {phase.resources && phase.resources.length > 0 && (
+                                <div className="p-2 bg-slate-900 rounded-lg border border-white/5">
+                                  <span className="text-[10px] text-slate-500 block mb-1 font-semibold">{isBn ? 'প্রস্তাবিত রিসোর্সসমূহ:' : 'Recommended Resources:'}</span>
+                                  <ul className="list-disc list-inside text-[10px] text-brand-blue space-y-0.5">
+                                    {phase.resources.map((res: string, rIdx: number) => (
+                                      <li key={rIdx}>{res}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ছ. সার্বিক ক্যারিয়ার সামারি রিপোর্ট (OVERALL CAREER SUMMARY REPORT VIEW) */}
+                {activeReport.type === 'overall_career' && (
+                  <div className="flex flex-col gap-6">
+                    {/* মূল সামারি প্যারাগ্রাফ */}
+                    <div className="p-5 bg-slate-950 rounded-2xl border border-white/5 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-40 h-40 bg-brand-green/5 blur-2xl rounded-full pointer-events-none" />
+                      <h4 className="text-sm font-bold text-white mb-2.5 flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-brand-green animate-pulse" />
+                        <span>{isBn ? 'এআই সার্বিক মূল্যায়ন সারাংশ' : 'Comprehensive AI Executive Summary'}</span>
+                      </h4>
+                      <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                        {(activeReport.data as any).summary}
+                      </p>
+                    </div>
+
+                    {/* শক্তির দিক ও দুর্বলতা (Strengths and Weaknesses) */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className="p-4 bg-brand-green/5 rounded-2xl border border-brand-green/10">
+                        <h4 className="text-sm font-bold text-brand-green mb-2 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{isBn ? 'চিহ্নিত পেশাদার শক্তিমত্তা' : 'Identified Core Strengths'}</span>
+                        </h4>
+                        <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                          {((activeReport.data as any).strengths || []).map((s: string, idx: number) => (
+                            <li key={idx}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+                        <h4 className="text-sm font-bold text-red-400 mb-2 flex items-center gap-1.5">
+                          <AlertCircle className="w-4 h-4" />
+                          <span>{isBn ? 'উন্নতিযোগ্য ক্ষেত্রসমূহ' : 'Areas for Direct Action'}</span>
+                        </h4>
+                        <ul className="text-xs text-slate-300 space-y-2 list-disc list-inside">
+                          {((activeReport.data as any).weaknesses || []).map((w: string, idx: number) => (
+                            <li key={idx}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    {/* স্কিল অ্যান্ড লার্নিং অ্যাকশন প্ল্যান */}
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">{isBn ? 'অনুপস্থিত টেক স্কিলসমূহ' : 'Missing Tech Stack'}</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {((activeReport.data as any).missingSkills || []).map((sk: string, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-red-400 border-red-500/20 text-[9px]">{sk}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-2">{isBn ? 'অগ্রাধিকার শিক্ষা ক্ষেত্র' : 'Priority Learning Areas'}</h4>
+                        <div className="flex flex-wrap gap-1">
+                          {((activeReport.data as any).priorityLearningAreas || []).map((la: string, idx: number) => (
+                            <Badge key={idx} variant="brand" className="text-[9px]">{la}</Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* সাজেস্টেড অ্যাকশন ও পরবর্তী ধাপ */}
+                    <div className="p-4 bg-slate-950 rounded-2xl border border-white/5">
+                      <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-1.5">
+                        <TrendingUp className="w-4 h-4 text-brand-blue" />
+                        <span>{isBn ? 'পরবর্তী বাস্তবসম্মত পদক্ষেপ' : 'Next Growth Action Steps'}</span>
+                      </h4>
+                      <ul className="text-xs text-slate-300 space-y-2.5">
+                        {((activeReport.data as any).suggestedNextSteps || []).map((step: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="p-0.5 rounded bg-brand-green/20 text-brand-green font-mono text-[9px] font-bold mt-0.5">0{idx + 1}</span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* পোর্টফোলিও প্রজেক্ট ও ভাইভা প্রস্তুতি */}
+                    <div className="grid md:grid-cols-3 gap-4">
+                      <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 flex flex-col gap-2">
+                        <h5 className="text-xs font-bold text-brand-green">{isBn ? 'প্রস্তাবিত সার্টিফিকেশন' : 'Target Certifications'}</h5>
+                        <ul className="text-[11px] text-slate-300 space-y-1 list-disc list-inside">
+                          {((activeReport.data as any).recommendedCertifications || []).map((cert: string, idx: number) => (
+                            <li key={idx}>{cert}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 flex flex-col gap-2">
+                        <h5 className="text-xs font-bold text-brand-blue">{isBn ? 'হাই-ইমপ্যাক্ট প্রজেক্ট আইডিয়া' : 'High-Impact Project Ideas'}</h5>
+                        <ul className="text-[11px] text-slate-300 space-y-1 list-disc list-inside">
+                          {((activeReport.data as any).recommendedPortfolioProjects || []).map((proj: string, idx: number) => (
+                            <li key={idx}>{proj}</li>
+                          ))}
+                        </ul>
+                      </div>
+
+                      <div className="p-4 bg-slate-950 rounded-2xl border border-white/5 flex flex-col gap-2">
+                        <h5 className="text-xs font-bold text-white">{isBn ? 'ভাইভা অনুশীলনের বিষয়' : 'Interview Prep Focus'}</h5>
+                        <ul className="text-[11px] text-slate-300 space-y-1 list-disc list-inside">
+                          {((activeReport.data as any).recommendedInterviewPrep || []).map((prep: string, idx: number) => (
+                            <li key={idx}>{prep}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
               </div>
 
               {/* প্রিভিউ মোডাল ফুটার (Modal Export Controls) */}
@@ -1050,7 +1557,25 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                     className="flex items-center gap-1.5 text-xs py-2 px-3 border border-white/5 hover:bg-slate-800"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    <span>{isBn ? 'পিডিএফ ও প্রিন্ট করুন' : 'Printable Version / PDF'}</span>
+                    <span>{isBn ? 'পিডিএফ ও প্রিন্ট' : 'PDF / Print'}</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleDownloadJSON(activeReport)}
+                    className="flex items-center gap-1.5 text-xs py-2 px-3 border border-white/5 hover:bg-slate-800"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>JSON</span>
+                  </Button>
+
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleDownloadCSV(activeReport)}
+                    className="flex items-center gap-1.5 text-xs py-2 px-3 border border-white/5 hover:bg-slate-800"
+                  >
+                    <FileDown className="w-3.5 h-3.5" />
+                    <span>CSV</span>
                   </Button>
 
                   <Button
@@ -1059,7 +1584,7 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                     className="flex items-center gap-1.5 text-xs py-2 px-3 font-semibold"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>{isBn ? 'PNG কার্ড ডাউনলোড' : 'Download PNG Card'}</span>
+                    <span>{isBn ? 'PNG কার্ড' : 'Download PNG'}</span>
                   </Button>
 
                   <Button
@@ -1069,7 +1594,7 @@ export const AiReports: React.FC<AiReportsProps> = ({ onNavigateToTab }) => {
                   >
                     <Share2 className="w-3.5 h-3.5" />
                     <span>
-                      {copiedId === activeReport.id ? (isBn ? 'লিঙ্ক কপিড!' : 'Copied!') : (isBn ? 'শেয়ার লিঙ্ক কপি' : 'Copy Share Link')}
+                      {copiedId === activeReport.id ? (isBn ? 'লিঙ্ক কপিড!' : 'Copied!') : (isBn ? 'শেয়ার লিঙ্ক' : 'Copy Link')}
                     </span>
                   </Button>
                 </div>

@@ -4,10 +4,10 @@
  */
 
 // রিপোর্ট টাইপসমূহ (Report Types)
-export type ReportType = 'resume' | 'interview' | 'passport' | 'growth' | 'improvement';
+export type ReportType = 'resume' | 'interview' | 'passport' | 'growth' | 'improvement' | 'roadmap' | 'overall_career';
 
 // এক্সপোর্ট ফরম্যাট (Export Formats)
-export type ExportFormat = 'pdf' | 'print' | 'png_card' | 'qr_card' | 'share_link';
+export type ExportFormat = 'pdf' | 'print' | 'png_card' | 'qr_card' | 'share_link' | 'json' | 'csv';
 
 // এআই রিপোর্ট ডেটা ইন্টারফেস (AI Report Data Interfaces)
 export interface ResumeReportData {
@@ -75,6 +75,38 @@ export interface InterviewImprovementReportData {
   generatedDate: string;
 }
 
+export interface RoadmapReportData {
+  roadmapId: string;
+  targetCareer: string;
+  phases: {
+    name: string;
+    description: string;
+    status: 'completed' | 'in_progress' | 'pending';
+    skills: string[];
+    resources?: string[];
+  }[];
+  completedPhases: number;
+  pendingPhases: number;
+  completionPercentage: number;
+  nextPhase: string;
+  estimatedCompletion: string;
+  generatedDate: string;
+}
+
+export interface OverallCareerReportData {
+  summary: string;
+  strengths: string[];
+  weaknesses: string[];
+  readinessScore: number;
+  missingSkills: string[];
+  priorityLearningAreas: string[];
+  suggestedNextSteps: string[];
+  recommendedCertifications: string[];
+  recommendedPortfolioProjects: string[];
+  recommendedInterviewPrep: string[];
+  generatedDate: string;
+}
+
 // মূল রিপোর্ট মডেল (Main Report Model)
 export interface AiReport {
   id: string;
@@ -83,7 +115,7 @@ export interface AiReport {
   titleBn: string;
   titleEn: string;
   createdAt: string;
-  data: ResumeReportData | InterviewReportData | SkillPassportReportData | CareerGrowthReportData | InterviewImprovementReportData;
+  data: ResumeReportData | InterviewReportData | SkillPassportReportData | CareerGrowthReportData | InterviewImprovementReportData | RoadmapReportData | OverallCareerReportData;
 }
 
 // ডাউনলোড ইতিহাস মডেল (Download History Model)

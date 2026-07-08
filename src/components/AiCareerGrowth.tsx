@@ -1,8 +1,8 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,1060 +12,461 @@ import {
   CheckSquare, Code, MessageSquareText, Shield, 
   Sparkles, Target, Zap, ChevronRight, 
   Loader2, Play, BookOpenCheck, ExternalLink, 
-  Clock, Flame, HelpCircle, FileText, ArrowRight, CheckCircle2
+  Clock, Flame, HelpCircle, FileText, ArrowRight, CheckCircle2,
+  RefreshCw, Briefcase, Server, ShieldCheck, Map, AlertCircle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, LineChart, Line, 
   XAxis, YAxis, CartesianGrid, Tooltip, 
-  Legend, BarChart, Bar, AreaChart, Area 
+  Legend, BarChart, Bar, AreaChart, Area,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
 import { Card, Button, Badge } from './UI';
-import { growthDb, getLearningResourcesForSkill } from '../lib/growthSupabase';
-import { 
-  CareerGrowth, LearningPlan, DailyTask, 
-  WeeklyGoal, GrowthAchievement, GrowthHistoryLog 
-} from '../types/growth';
+import { cvDb } from '../lib/cvSupabase';
 import { interviewDb } from '../lib/interviewSupabase';
-import { calculateLevel } from '../lib/passportSupabase';
+import { passportDb } from '../lib/passportSupabase';
+import { growthDb } from '../lib/growthSupabase';
+import { growthGroq } from '../lib/growthGroq';
+import { CareerProgressData, TaskItem } from '../types/growth';
 
-// আইকন ডাইনামিক ম্যাপিং (Icon dynamic mapping for achievements/badges)
-const ICON_MAP: Record<string, React.FC<any>> = {
-  Award: Award,
-  Shield: Shield,
-  Sparkles: Sparkles,
-  MessageSquareText: MessageSquareText,
-  Zap: Zap,
-  Target: Target,
-};
 
 interface AiCareerGrowthProps {
-  onNavigateToTab: (tabId: string) => void;
-  initialFocusSection?: 'growth' | 'roadmap' | 'progress';
+  onNavigateToTab?: (tabId: string) => void;
+  initialFocusSection?: string;
 }
 
-export const AiCareerGrowth: React.FC<AiCareerGrowthProps> = ({ onNavigateToTab, initialFocusSection }) => {
+export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হাব মূল কম্পোনেন্ট */ React.FC<AiCareerGrowthProps> = ({ onNavigateToTab }) => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const isEn = language === 'en';
 
-  useEffect(() => {
-    if (initialFocusSection) {
-      const elementId = initialFocusSection === 'roadmap' ? 'section-learning-roadmap' : 
-                        initialFocusSection === 'progress' ? 'section-skill-analytics' : null;
-      if (elementId) {
-        setTimeout(() => {
-          const el = document.getElementById(elementId);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 300);
-      }
-    }
-  }, [initialFocusSection]);
-
   const [loading, setLoading] = useState<boolean>(true);
-  const [syncing, setSyncing] = useState<boolean>(false);
-  const [hasData, setHasData] = useState<boolean>(false);
+  const [generating, setGenerating] = useState<boolean>(false);
+  const [progress, setProgress] = useState<CareerProgressData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // ডোমেইন ডাটা স্টেটস (Domain data states)
-  const [growthData, setGrowthData] = useState<CareerGrowth | null>(null);
-  const [learningPlan, setLearningPlan] = useState<LearningPlan | null>(null);
-  const [dailyTask, setDailyTask] = useState<DailyTask | null>(null);
-  const [weeklyGoal, setWeeklyGoal] = useState<WeeklyGoal | null>(null);
-  const [achievements, setAchievements] = useState<GrowthAchievement[]>([]);
-  const [historyLogs, setHistoryLogs] = useState<GrowthHistoryLog[]>([]);
-  const [chartData, setChartData] = useState<any[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatMessages, setChatMessages] = useState<{role: 'user'|'assistant', text: string}[]>([]);
+  const [chatLoading, setChatLoading] = useState(false);
 
-  // ইউজার ইন্টারেকশন স্টেটস (User interaction states)
-  const [roadmapTab, setRoadmapTab] = useState<'7_days' | '30_days' | '90_days'>('7_days');
-  const [analyticsTab, setAnalyticsTab] = useState<'scores' | 'skills'>('scores');
-
-  // ডাটা লোড ও সিঙ্ক মডিউল (Data Loading & Syncing Module)
-  const loadAndSyncData = async (forceSync = false) => {
+  const loadData = async () => {
     if (!user) return;
     setLoading(true);
+    setError(null);
     try {
-      // প্রথমে চেক করা ইউজার ইন্টারভিউ হিস্টোরি আছে কিনা (Check if the user has interview history first)
-      const sessions = await interviewDb.getSessions(user.id);
-      const completed = sessions.filter(s => s.status === 'completed');
-
-      if (completed.length === 0) {
-        setHasData(false);
-        setLoading(false);
-        return;
-      }
-
-      setHasData(true);
-
-      if (forceSync) {
-        setSyncing(true);
-      }
-
-      // এআই ক্যারিয়ার গ্রোথ হাবের সিঙ্ক ইঞ্জিন রান করা (Run AI Growth Hub Sync Engine)
-      await growthDb.syncGrowthHub(user.id, user.fullName || 'User');
-
-      // সিঙ্ক সম্পন্ন হবার পর লোকাল ডাটাবেজ থেকে ডাটা লোড করা (Fetch loaded data from tables)
-      const growth = await growthDb.getCareerGrowth(user.id);
-      const plan = await growthDb.getLearningPlan(user.id);
+      const data = await growthDb.getCareerProgress(user.id);
       
-      const todayStr = new Date().toISOString().split('T')[0];
-      const task = await growthDb.getDailyTask(user.id, todayStr);
-      const goal = await growthDb.getWeeklyGoal(user.id);
-      const achs = await growthDb.getAchievements(user.id);
-      const logs = await growthDb.getHistoryLogs(user.id);
+      let needsUpdate = false;
+      if (!data) {
+         needsUpdate = true;
+      } else {
+         const resumes = await cvDb.getResumes(user.id);
+         const interviews = await interviewDb.getSessions(user.id);
+         const skills = await passportDb.getSkillsByUserId(user.id);
+         
+         const lastGenTime = new Date(data.lastGenerated).getTime();
+         
+         const latestResume = Math.max(0, ...resumes.map(r => new Date(r.updatedAt || r.createdAt || 0).getTime()));
+         const latestInterview = Math.max(0, ...interviews.map(i => new Date(i.completedAt || i.createdAt || 0).getTime()));
+         const latestSkill = Math.max(0, ...skills.map(s => new Date(s.lastAssessmentDate || 0).getTime()));
+         
+         // Assuming profile changes update user.updatedAt, but we don't have that in AuthContext maybe.
+         
+         const latestChange = Math.max(latestResume, latestInterview, latestSkill);
+         if (latestChange > lastGenTime) {
+            needsUpdate = true;
+         }
+      }
 
-      setGrowthData(growth);
-      setLearningPlan(plan);
-      setDailyTask(task);
-      setWeeklyGoal(goal);
-      setAchievements(achs);
-      setHistoryLogs(logs);
-
-      // চার্টের জন্য ইন্টারভিউ ডাটা ফরম্যাট করা (Format Interview History for Recharts rendering)
-      const sortedHistory = [...completed].reverse(); // Oldest to newest
-      const formattedHistory = sortedHistory.map((s, idx) => ({
-        index: idx + 1,
-        title: isEn ? `Viva ${idx + 1}` : `ভাইভা ${idx + 1}`,
-        date: new Date(s.completedAt || s.createdAt).toLocaleDateString(isEn ? 'en-US' : 'bn-BD', { month: 'short', day: 'numeric' }),
-        overall: s.scores?.overall || 0,
-        technical: s.scores?.technical || 0,
-        communication: s.scores?.communication || 0,
-        confidence: s.scores?.confidence || 0,
-        problemSolving: s.scores?.problemSolving || 0,
-      }));
-      setChartData(formattedHistory);
-
-    } catch (err) {
-      console.error('Error loading career growth data:', err);
+      if (needsUpdate) {
+        await generateNewProgress();
+      } else {
+        setProgress(data);
+      }
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
-      setSyncing(false);
     }
   };
 
   useEffect(() => {
-    loadAndSyncData();
+    loadData();
   }, [user]);
 
-  // ডেইলি টাস্ক প্রগ্রেস টগল হ্যান্ডলার (Toggle checklist progress for daily tasks)
-  const handleToggleDailyTask = async (type: 'codingTask' | 'communicationPractice' | 'interviewQuestion' | 'miniAssignment') => {
-    if (!dailyTask || !user) return;
-    
-    const updatedTask = {
-      ...dailyTask,
-      [type]: {
-        ...dailyTask[type],
-        completed: !dailyTask[type].completed
-      }
-    };
+  const generateNewProgress = async () => { /* ইউজারের নতুন ডাটা দিয়ে এআই এনালাইসিস তৈরি করা */
+    if (!user) return;
+    setGenerating(true);
+    setError(null);
+    try {
+      // Load all user data
+      const resumes = await cvDb.getResumes(user.id);
+      const interviews = await interviewDb.getSessions(user.id);
+      const skills = await passportDb.getSkillsByUserId(user.id);
 
-    setDailyTask(updatedTask);
-    await growthDb.saveDailyTask(updatedTask);
+      const aiData = await growthGroq.generateCareerProgress(user, resumes, interviews, skills);
+      
+      const newProgress: CareerProgressData = {
+        id: crypto.randomUUID(),
+        userId: user.id,
+        ...aiData as any,
+        lastGenerated: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
 
-    // হিস্টোরি লগে রেকর্ড অ্যাড করা (Add log to progress history)
-    const taskName = type === 'codingTask' ? 'কোডিং চ্যালেঞ্জ' :
-                     type === 'communicationPractice' ? 'যোগাযোগ দক্ষতা' :
-                     type === 'interviewQuestion' ? 'ভাইভা প্রশ্নোত্তর' : 'মিনি অ্যাসাইনমেন্ট';
-    
-    await growthDb.addHistoryLog({
-      id: `LOG-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-      userId: user.id,
-      date: new Date().toISOString().split('T')[0],
-      eventName: 'Daily Practice Update',
-      changeDescription: `${taskName} সম্পূর্ণতা আপডেট করা হয়েছে।`,
-      metricType: 'goal',
-      oldValue: (!updatedTask[type].completed).toString(),
-      newValue: (updatedTask[type].completed).toString()
-    });
-  };
-
-  // উইকলি গোল চেক হ্যান্ডলার (Toggle Weekly goal tasks checklists and progress)
-  const handleToggleWeeklyGoalTask = async (taskText: string, isCompleted: boolean) => {
-    if (!weeklyGoal || !user) return;
-
-    let updatedRemaining = [...weeklyGoal.remainingTasks];
-    let updatedCompleted = [...weeklyGoal.completedTasks];
-
-    if (isCompleted) {
-      // রিমেইনিং থেকে কমপ্লিটেড-এ সরানো (Move from remaining to completed)
-      updatedRemaining = updatedRemaining.filter(t => t !== taskText);
-      if (!updatedCompleted.includes(taskText)) {
-        updatedCompleted.push(taskText);
-      }
-    } else {
-      // কমপ্লিটেড থেকে রিমেইনিং-এ সরানো (Move from completed to remaining)
-      updatedCompleted = updatedCompleted.filter(t => t !== taskText);
-      if (!updatedRemaining.includes(taskText)) {
-        updatedRemaining.push(taskText);
-      }
-    }
-
-    const total = updatedRemaining.length + updatedCompleted.length;
-    const pct = total > 0 ? Math.round((updatedCompleted.length / total) * 100) : 0;
-
-    const updatedGoal: WeeklyGoal = {
-      ...weeklyGoal,
-      remainingTasks: updatedRemaining,
-      completedTasks: updatedCompleted,
-      completedPercentage: pct,
-      estimatedCompletion: pct === 100 ? (isEn ? 'Completed' : 'সম্পূর্ণ হয়েছে') : weeklyGoal.estimatedCompletion,
-      updatedAt: new Date().toISOString()
-    };
-
-    setWeeklyGoal(updatedGoal);
-    await growthDb.saveWeeklyGoal(updatedGoal);
-
-    // যদি ১০০% সম্পূর্ণ হয়, লক্ষ্যভেদকারী অ্যাচিভমেন্ট চেক এবং আনলক করা (Unlock Goal Crusher badge if 100% completed)
-    if (pct === 100) {
-      await growthDb.unlockAchievement(user.id, 'weekly_goal_completed');
-      // অ্যাচিভমেন্ট স্টেট রি-লোড করা (Refresh achievements state)
-      const updatedAchs = await growthDb.getAchievements(user.id);
-      setAchievements(updatedAchs);
+      await growthDb.saveCareerProgress(newProgress);
+      setProgress(newProgress);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setGenerating(false);
     }
   };
 
-  // এআই গ্রোথ ডাটা রিফ্রেশ হ্যান্ডলার (Regenerate and sync with latest AI logic)
-  const handleRegenerateHub = () => {
-    loadAndSyncData(true);
+  const handleTaskToggle = async /* টাস্ক আপডেট এবং সুপাবেজ এ সেভ করা */ (section: keyof CareerProgressData['actionPlan'], taskId: string) => {
+    if (!progress) return;
+    const newPlan = { ...progress.actionPlan };
+    newPlan[section] = newPlan[section].map((t: TaskItem) => 
+      t.id === taskId ? { ...t, completed: !t.completed } : t
+    );
+    const newProgress = { ...progress, actionPlan: newPlan };
+    setProgress(newProgress);
+    await growthDb.updateActionPlan(user!.id, newPlan);
+  };
+
+  const handleChat = async /* এআই চ্যাট কোচের সাথে মেসেজ আদানপ্রদান */ () => {
+    if (!chatInput.trim() || !user || !progress) return;
+    const msg = chatInput.trim();
+    setChatInput('');
+    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
+    setChatLoading(true);
+    try {
+      const reply = await growthGroq.chat(user, progress, msg);
+      setChatMessages(prev => [...prev, { role: 'assistant', text: reply }]);
+    } catch (err: any) {
+      setChatMessages(prev => [...prev, { role: 'assistant', text: "Error: " + err.message }]);
+    } finally {
+      setChatLoading(false);
+    }
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center gap-4">
-        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
-        <p className="text-slate-400 font-mono text-sm">
-          {isEn ? 'Syncing candidate interview history with AI Career Growth engine...' : 'ভাইভা হিস্টোরির সাথে ক্যারিয়ার গ্রোথ হাব রি-সিঙ্ক করা হচ্ছে...'}
-        </p>
+      <div className="flex flex-col items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-4" />
+        <p className="text-slate-400 font-mono">Loading Career Growth Hub...</p>
       </div>
     );
   }
 
-  // ১. ইউজার ইন্টারভিউ না দিলে ফলব্যাক এম্পটি স্টেট (Show Empty State if candidate hasn't completed any interviews)
-  if (!hasData) {
+  if (generating) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-xl mx-auto text-center py-12 px-6"
-      >
-        <Card hoverEffect={false} className="border border-white/10 bg-slate-950/60 p-8 flex flex-col items-center gap-6">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
-            <Zap className="w-8 h-8 text-emerald-400" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-white mb-2 font-display">
-              {isEn ? 'Activate AI Career Growth Hub' : 'এআই ক্যারিয়ার গ্রোথ হাব সক্রিয় করুন'}
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed mb-4">
-              {isEn 
-                ? 'Your learning plans, daily tasks, resources, and custom analytics are generated based on actual assessments. Complete at least one AI Live Interview to generate your career roadmap.' 
-                : 'আপনার লার্নিং রোডম্যাপ, দৈনিক চ্যালেঞ্জ এবং স্কিল অ্যানালিটিক্স সম্পূর্ণ রিয়েল ইন্টারভিউ হিস্টোরির ওপর ভিত্তি করে কাজ করে। গ্রোথ হাব চালু করতে আপনার প্রথম এআই ভাইভা সম্পন্ন করুন।'}
-            </p>
-            <Badge variant="warning">
-              {isEn ? 'Requires 1 Completed Interview' : 'অন্তত ১টি সম্পন্ন ভাইভা আবশ্যক'}
-            </Badge>
-          </div>
-          <Button 
-            variant="primary" 
-            className="w-full justify-center"
-            onClick={() => onNavigateToTab('interview')}
-          >
-            {isEn ? 'Start AI Interview Now' : 'ভাইভা শুরু করুন'}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </Card>
-      </motion.div>
+      <div className="flex flex-col items-center justify-center py-20 space-y-6">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
+          <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-emerald-400 animate-pulse" />
+        </div>
+        <div className="text-center">
+          <h3 className="text-xl font-display font-bold text-white mb-2">Analyzing Your Career Profile</h3>
+          <p className="text-slate-400 font-mono text-sm max-w-md">Groq AI is processing your resumes, interview history, and skill passport to generate a personalized career roadmap...</p>
+        </div>
+      </div>
     );
   }
 
-  // স্কিল ও রিসোর্স অবজেক্ট ডাইনামিক ফিল্টার (Fetch real resources based on weakest skills)
-  const resourcesList = growthData 
-    ? getLearningResourcesForSkill(growthData.weakestSkill)
-    : getLearningResourcesForSkill('React Hooks');
+  if (error || !progress) {
+    return (
+      <Card className="text-center py-12 border-red-500/20 bg-red-500/5">
+        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+        <h3 className="text-lg font-bold text-white mb-2">Analysis Failed</h3>
+        <p className="text-slate-400 text-sm mb-6">{error || "Could not load data."}</p>
+        <Button onClick={generateNewProgress} variant="primary">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Retry Analysis
+        </Button>
+      </Card>
+    );
+  }
 
   return (
-    <div id="career-growth-hub-root" className="space-y-8 pb-16">
-      
-      {/* হেডার সেকশন ও রিয়েল-টাইম সিঙ্ক বাটন (Header Section with Sync Action) */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-display font-bold text-white tracking-tight flex items-center gap-2">
-            <TrendingUp className="text-emerald-400 w-8 h-8" />
-            {isEn ? 'AI Career Growth Hub' : 'এআই ক্যারিয়ার গ্রোথ হাব'}
-          </h1>
+          <div className="flex items-center gap-2 mb-2">
+            <TrendingUp className="w-6 h-6 text-emerald-400" />
+            <h1 className="text-2xl font-bold text-white font-display">AI Career Coach</h1>
+          </div>
           <p className="text-slate-400 text-sm">
-            {isEn 
-              ? 'Continuously improve and bridge skill gaps based on your live assessments' 
-              : 'বাস্তব ইন্টারভিউ ইতিহাস এবং এআই অ্যাসেসমেন্টের ওপর ভিত্তি করে ক্রমাগত নিজেকে দক্ষ করে তুলুন'}
+            Personalized career growth plan based on your verified skills and interviews.
           </p>
+          <div className="flex items-center gap-2 mt-3 text-xs font-mono text-slate-500">
+            <Clock className="w-3 h-3" />
+            Last updated: {new Date(progress.lastGenerated).toLocaleString()}
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRegenerateHub}
-            isLoading={syncing}
-            className="border-white/10 hover:border-emerald-500/20"
-          >
-            <Zap className="w-4 h-4 text-emerald-400 mr-2" />
-            {isEn ? 'Regenerate AI Hub' : 'এআই গ্রোথ আপডেট করুন'}
-          </Button>
-        </div>
+        <Button onClick={generateNewProgress} variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh Analysis
+        </Button>
       </div>
 
-      {/* SECTION 1: CAREER OVERVIEW (ক্যারিয়ার গ্রোথ ওভারভিউ) */}
-      <div id="section-career-overview" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* ক্যারিয়ার পাথ ও লেভেল কার্ড */}
-        <Card hoverEffect={true} className="border border-white/5 bg-slate-950/40 flex flex-col justify-between">
-          <div>
-            <span className="text-slate-500 text-xs font-mono block uppercase">
-              {isEn ? 'CURRENT CAREER PATH' : 'বর্তমান ক্যারিয়ার পথ'}
-            </span>
-            <h3 className="text-lg font-bold text-white mt-1 font-display line-clamp-2">
-              {growthData?.careerPath || 'Software Engineer'}
-            </h3>
-          </div>
-          <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-            <span className="text-xs text-slate-400">{isEn ? 'Current Level:' : 'বর্তমান লেভেল:'}</span>
-            <Badge variant="brand">{growthData?.level || 'Bronze'}</Badge>
-          </div>
+      {/* Career Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Overall Score</p>
+          <p className="text-3xl font-bold text-emerald-400">{progress.overallScore}</p>
         </Card>
-
-        {/* ইন্টারভিউ রেডিনেস স্কোর */}
-        <Card hoverEffect={true} className="border border-white/5 bg-slate-950/40 flex flex-col justify-between">
-          <div>
-            <span className="text-slate-500 text-xs font-mono block uppercase">
-              {isEn ? 'READINESS SCORE' : 'ভাইভা প্রস্তুতি সূচক'}
-            </span>
-            <div className="flex items-baseline gap-2 mt-2">
-              <span className="text-4xl font-extrabold text-cyan-400 font-sans">
-                {growthData?.readinessScore}%
-              </span>
-              <span className={`text-xs flex items-center font-semibold ${
-                (growthData?.overallProgress || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
-              }`}>
-                {(growthData?.overallProgress || 0) >= 0 ? '+' : ''}
-                {growthData?.overallProgress}% {isEn ? 'overall' : 'অগ্রগতি'}
-              </span>
-            </div>
-          </div>
-          <div className="mt-4 pt-3 border-t border-white/5">
-            <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-              <div 
-                className="bg-cyan-400 h-full transition-all duration-500"
-                style={{ width: `${growthData?.readinessScore || 50}%` }}
-              />
-            </div>
-          </div>
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Resume Score</p>
+          <p className="text-3xl font-bold text-white">{progress.resumeScore}</p>
         </Card>
-
-        {/* মোস্ট ইম্প্রুভড স্কিল */}
-        <Card hoverEffect={true} className="border border-white/5 bg-slate-950/40 flex flex-col justify-between">
-          <div>
-            <span className="text-slate-500 text-xs font-mono block uppercase">
-              {isEn ? 'MOST IMPROVED SKILL' : 'সবচেয়ে উন্নত স্কিল'}
-            </span>
-            <h3 className="text-xl font-bold text-emerald-400 mt-2 font-display">
-              {growthData?.mostImprovedSkill || 'Problem Solving'}
-            </h3>
-          </div>
-          <div className="mt-4 pt-3 border-t border-white/5 text-xs text-slate-400 flex items-center gap-1.5">
-            <Flame className="w-4 h-4 text-amber-500" />
-            <span>{isEn ? 'Showing positive momentum' : 'ধারাবাহিক মূল্যায়ন থেকে নির্ধারিত'}</span>
-          </div>
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">ATS Score</p>
+          <p className="text-3xl font-bold text-white">{progress.atsScore}</p>
         </Card>
-
-        {/* দুর্বলতম স্কিল */}
-        <Card hoverEffect={true} className="border border-white/5 bg-slate-950/40 flex flex-col justify-between">
-          <div>
-            <span className="text-slate-500 text-xs font-mono block uppercase text-rose-400">
-              {isEn ? 'WEAKEST AREA' : 'দুর্বলতম স্কিল (ফোকাস)'}
-            </span>
-            <h3 className="text-xl font-bold text-rose-400 mt-2 font-display">
-              {growthData?.weakestSkill || 'React Hooks'}
-            </h3>
-          </div>
-          <div className="mt-4 pt-3 border-t border-white/5 text-xs text-slate-400">
-            <span>{isEn ? 'Targeted in roadmap & daily tasks' : 'রোডম্যাপ এবং প্র্যাকটিসে প্রধান ফোকাস'}</span>
-          </div>
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Interview Score</p>
+          <p className="text-3xl font-bold text-white">{progress.interviewScore}</p>
+        </Card>
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Skill Score</p>
+          <p className="text-3xl font-bold text-white">{progress.skillScore}</p>
+        </Card>
+        <Card className="p-4 bg-slate-900 border-white/5 text-center">
+          <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Profile</p>
+          <p className="text-3xl font-bold text-blue-400">{progress.profileCompletion}%</p>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* বাম কলাম: ডেইলি প্র্যাকটিস ও উইকলি গোল (Left Column: Daily Practice + Weekly Goals) */}
+        {/* Left Column */}
         <div className="lg:col-span-2 space-y-6">
-          
-          {/* SECTION 4: DAILY PRACTICE (ডেইলি মাইক্রো প্র্যাকটিস) */}
-          <Card hoverEffect={false} id="section-daily-practice" className="border border-white/5 bg-slate-950/40">
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-white/5">
-              <div className="flex items-center gap-2">
-                <CheckSquare className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-xl font-bold text-white font-display">
-                  {isEn ? "Today's Practice" : "আজকের এআই মাইক্রো-প্র্যাকটিস"}
-                </h2>
-              </div>
-              <span className="text-xs font-mono text-slate-500 bg-white/5 px-2.5 py-1 rounded-md">
-                {new Date().toLocaleDateString(isEn ? 'en-US' : 'bn-BD', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-              </span>
-            </div>
-
-            {dailyTask ? (
-              <div className="space-y-4">
-                
-                {/* কোডিং টাস্ক */}
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex flex-col md:flex-row md:items-start gap-4">
-                  <button 
-                    onClick={() => handleToggleDailyTask('codingTask')}
-                    className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 border-emerald-500/40 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/10 transition-all"
-                  >
-                    {dailyTask.codingTask.completed && <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-slate-950" />}
-                  </button>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-cyan-400 bg-cyan-400/10 px-2 py-0.5 rounded">Coding Challenge</span>
-                      <h4 className={`text-sm font-bold text-white ${dailyTask.codingTask.completed ? 'line-through text-slate-500' : ''}`}>
-                        {dailyTask.codingTask.title}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      {dailyTask.codingTask.description}
-                    </p>
-                    {dailyTask.codingTask.codeTemplate && (
-                      <pre className="text-[11px] font-mono p-3 rounded-lg bg-slate-950 border border-white/5 overflow-x-auto text-slate-300">
-                        <code>{dailyTask.codingTask.codeTemplate}</code>
-                      </pre>
-                    )}
-                  </div>
-                </div>
-
-                {/* কম্যুনিকেশন প্র্যাকটিস */}
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex flex-col md:flex-row md:items-start gap-4">
-                  <button 
-                    onClick={() => handleToggleDailyTask('communicationPractice')}
-                    className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 border-emerald-500/40 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/10 transition-all"
-                  >
-                    {dailyTask.communicationPractice.completed && <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-slate-950" />}
-                  </button>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded">Communication</span>
-                      <h4 className={`text-sm font-bold text-white ${dailyTask.communicationPractice.completed ? 'line-through text-slate-500' : ''}`}>
-                        {isEn ? 'Interactive Pitch Prompt' : 'বাস্তব কথোপকথন প্রস্তুতি'}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-200 font-medium">
-                      "{dailyTask.communicationPractice.prompt}"
-                    </p>
-                    <p className="text-xs text-slate-400">
-                      {dailyTask.communicationPractice.description}
-                    </p>
-                  </div>
-                </div>
-
-                {/* ভাইভা কোশ্চেন */}
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex flex-col md:flex-row md:items-start gap-4">
-                  <button 
-                    onClick={() => handleToggleDailyTask('interviewQuestion')}
-                    className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 border-emerald-500/40 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/10 transition-all"
-                  >
-                    {dailyTask.interviewQuestion.completed && <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-slate-950" />}
-                  </button>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded">Viva Q&A</span>
-                      <h4 className={`text-sm font-bold text-white ${dailyTask.interviewQuestion.completed ? 'line-through text-slate-500' : ''}`}>
-                        {dailyTask.interviewQuestion.question}
-                      </h4>
-                    </div>
-                    <div className="text-xs text-slate-400 pt-1.5 border-t border-white/5 space-y-1 bg-[#090909] p-3 rounded-lg">
-                      <span className="font-semibold text-slate-300 block font-mono">{isEn ? 'Ideal Answer Outline:' : 'আদর্শ উত্তরের মূল দিকসমূহ:'}</span>
-                      <p className="leading-relaxed whitespace-pre-line">{dailyTask.interviewQuestion.idealAnswerOutline}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* মিনি অ্যাসাইনমেন্ট */}
-                <div className="p-4 rounded-xl bg-white/5 border border-white/5 flex flex-col md:flex-row md:items-start gap-4">
-                  <button 
-                    onClick={() => handleToggleDailyTask('miniAssignment')}
-                    className="mt-1 flex-shrink-0 w-6 h-6 rounded-md border-2 border-emerald-500/40 flex items-center justify-center hover:border-emerald-400 hover:bg-emerald-500/10 transition-all"
-                  >
-                    {dailyTask.miniAssignment.completed && <CheckCircle2 className="w-5 h-5 text-emerald-400 fill-slate-950" />}
-                  </button>
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded">Mini Assignment</span>
-                      <h4 className={`text-sm font-bold text-white ${dailyTask.miniAssignment.completed ? 'line-through text-slate-500' : ''}`}>
-                        {dailyTask.miniAssignment.title}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                      {dailyTask.miniAssignment.description}
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            ) : (
-              <div className="text-center p-6 text-slate-500 text-xs">
-                {isEn ? 'Generating dynamic task checklist...' : 'আজকের মাইক্রো প্র্যাকটিস চ্যালেঞ্জ লোড হচ্ছে...'}
-              </div>
-            )}
-          </Card>
-
-          {/* SECTION 5: WEEKLY GOALS (উইকলি গোল ট্র্যাকার) */}
-          <Card hoverEffect={false} id="section-weekly-goals" className="border border-white/5 bg-slate-950/40">
+          {/* Job Readiness */}
+          <Card className="bg-slate-900 border-white/5 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-emerald-400" />
-                <h2 className="text-xl font-bold text-white font-display">
-                  {isEn ? 'Weekly Progress Goals' : 'সাপ্তাহিক লক্ষ্য ও অগ্রগতি'}
-                </h2>
+                <Target className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-bold text-white">Job Readiness</h2>
               </div>
-              <Badge variant="info">{weeklyGoal?.estimatedCompletion || '4 Days remaining'}</Badge>
+              <Badge variant={progress.jobReadiness === 'Highly Competitive' ? 'success' : 'default'}>
+                {progress.jobReadiness}
+              </Badge>
             </div>
+            <p className="text-slate-300 text-sm leading-relaxed">{progress.readinessReason}</p>
+          </Card>
 
-            <div className="space-y-4">
-              <div className="p-4 rounded-xl bg-white/5 border border-white/5">
-                <h3 className="text-sm font-bold text-white mb-2">{weeklyGoal?.goalTitle}</h3>
-                
-                {/* প্রগ্রেস বার */}
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                  <span>{isEn ? 'Completed tasks' : 'সম্পন্ন কাজসমূহ'}</span>
-                  <span className="font-mono font-bold text-emerald-400">{weeklyGoal?.completedPercentage}%</span>
-                </div>
-                <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
-                  <div 
-                    className="bg-emerald-500 h-full transition-all duration-300 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                    style={{ width: `${weeklyGoal?.completedPercentage || 0}%` }}
-                  />
-                </div>
+          {/* Strengths & Weaknesses */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-emerald-950/20 border-emerald-500/20 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Zap className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-md font-bold text-emerald-400">Top Strengths</h3>
               </div>
-
-              {/* টাস্ক চেকলিস্ট গ্রিড */}
-              <div className="space-y-2">
-                {/* রিমেইনিং কাজসমূহ */}
-                {weeklyGoal?.remainingTasks.map((t, idx) => (
-                  <label 
-                    key={`rem-${idx}`}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-[#0e0e0e] border border-white/5 hover:bg-white/5 transition-all cursor-pointer"
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={false}
-                      onChange={() => handleToggleWeeklyGoalTask(t, true)}
-                      className="w-4 h-4 rounded border-white/15 text-emerald-500 bg-transparent focus:ring-0"
-                    />
-                    <span className="text-xs text-slate-300 font-medium">{t}</span>
-                  </label>
+              <ul className="space-y-3">
+                {progress.strengths.slice(0,5).map((s, idx) => (
+                  <li key={idx} className="flex justify-between items-center text-sm">
+                    <span className="text-slate-200">{s.name}</span>
+                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">{s.confidence}%</Badge>
+                  </li>
                 ))}
+              </ul>
+            </Card>
 
-                {/* সম্পন্ন কাজসমূহ */}
-                {weeklyGoal?.completedTasks.map((t, idx) => (
-                  <label 
-                    key={`comp-${idx}`}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-[#0c0c0c] border border-white/5 border-emerald-500/10 opacity-70 cursor-pointer"
-                  >
-                    <input 
-                      type="checkbox" 
-                      checked={true}
-                      onChange={() => handleToggleWeeklyGoalTask(t, false)}
-                      className="w-4 h-4 rounded border-emerald-500/30 text-emerald-500 bg-transparent focus:ring-0"
-                    />
-                    <span className="text-xs text-emerald-400 font-medium line-through">{t}</span>
-                  </label>
+            <Card className="bg-red-950/20 border-red-500/20 p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Shield className="w-5 h-5 text-red-400" />
+                <h3 className="text-md font-bold text-red-400">Areas to Improve</h3>
+              </div>
+              <ul className="space-y-3">
+                {progress.weaknesses.slice(0,5).map((w, idx) => (
+                  <li key={idx} className="flex justify-between items-center text-sm">
+                    <span className="text-slate-200">{w.name}</span>
+                    <Badge variant="outline" className={`text-[10px] ${w.priority === 'High' ? 'border-red-500/50 text-red-400' : 'border-orange-500/30 text-orange-400'}`}>{w.priority}</Badge>
+                  </li>
                 ))}
+              </ul>
+            </Card>
+          </div>
 
-                {weeklyGoal?.remainingTasks.length === 0 && weeklyGoal?.completedTasks.length === 0 && (
-                  <div className="text-center py-4 text-slate-500 text-xs">
-                    {isEn ? 'No weekly tasks loaded.' : 'কোনো সাপ্তাহিক লক্ষ্য রেকর্ড করা নেই।'}
-                  </div>
-                )}
-              </div>
+          {/* AI Suggestions */}
+          <Card className="bg-slate-900 border-white/5 p-6">
+             <div className="flex items-center gap-2 mb-6">
+                <Sparkles className="w-5 h-5 text-purple-400" />
+                <h2 className="text-lg font-bold text-white">Personalized AI Coach</h2>
             </div>
-          </Card>
-
-        </div>
-
-        {/* ডান কলাম: রোডম্যাপ ও রিসোর্স লিংক (Right Column: Learning Roadmap + Resources) */}
-        <div className="space-y-6">
-          
-          {/* SECTION 2: AI LEARNING ROADMAP (এআই লার্নিং রোডম্যাপ) */}
-          <Card hoverEffect={false} id="section-learning-roadmap" className="border border-white/5 bg-slate-950/40">
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white font-display">
-                {isEn ? 'AI Learning Roadmap' : 'এআই লার্নিং রোডম্যাপ'}
-              </h2>
-            </div>
-
-            {/* ৭ দিন, ৩০ দিন, ৯০ দিনের ট্যাবস */}
-            <div className="flex bg-white/5 p-1 rounded-xl mb-4 text-xs font-semibold">
-              <button 
-                onClick={() => setRoadmapTab('7_days')}
-                className={`flex-1 py-2 text-center rounded-lg transition-all ${
-                  roadmapTab === '7_days' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {isEn ? '7 Days' : '৭ দিন'}
-              </button>
-              <button 
-                onClick={() => setRoadmapTab('30_days')}
-                className={`flex-1 py-2 text-center rounded-lg transition-all ${
-                  roadmapTab === '30_days' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {isEn ? '30 Days' : '৩০ দিন'}
-              </button>
-              <button 
-                onClick={() => setRoadmapTab('90_days')}
-                className={`flex-1 py-2 text-center rounded-lg transition-all ${
-                  roadmapTab === '90_days' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {isEn ? '90 Days' : '৯০ দিন'}
-              </button>
-            </div>
-
-            {learningPlan ? (
-              <div className="space-y-4 text-xs">
-                {/* সিলেক্টেড প্ল্যান টপিক কনটেন্ট */}
-                {(() => {
-                  const item = roadmapTab === '7_days' ? learningPlan.roadmap7Days :
-                               roadmapTab === '30_days' ? learningPlan.roadmap30Days :
-                               learningPlan.roadmap90Days;
-                  return (
-                    <div className="space-y-4">
-                      
-                      {/* টপিকস */}
-                      <div>
-                        <span className="font-bold text-emerald-400 uppercase block mb-1.5 tracking-wider text-[10px] font-mono">
-                          {isEn ? 'STUDY TOPICS' : 'পড়াশোনার বিষয়সমূহ'}
-                        </span>
-                        <ul className="space-y-1 list-disc pl-4 text-slate-300 font-medium">
-                          {item.topics.map((t, i) => <li key={i}>{t}</li>)}
-                        </ul>
-                      </div>
-
-                      {/* প্র্যাকটিস টাস্ক */}
-                      <div>
-                        <span className="font-bold text-cyan-400 uppercase block mb-1.5 tracking-wider text-[10px] font-mono">
-                          {isEn ? 'PRACTICE CHALLENGES' : 'ব্যবহারিক প্র্যাকটিস চ্যালেঞ্জ'}
-                        </span>
-                        <ul className="space-y-1 list-disc pl-4 text-slate-300">
-                          {item.practiceTasks.map((t, i) => <li key={i}>{t}</li>)}
-                        </ul>
-                      </div>
-
-                      {/* মিনি প্রজেক্ট */}
-                      {item.miniProjects && item.miniProjects.length > 0 && (
-                        <div>
-                          <span className="font-bold text-purple-400 uppercase block mb-1.5 tracking-wider text-[10px] font-mono">
-                            {isEn ? 'PORTFOLIO PROJECTS' : 'পোর্টফোলিও মিনি প্রজেক্ট'}
-                          </span>
-                          <ul className="space-y-1 list-disc pl-4 text-slate-300">
-                            {item.miniProjects.map((p, i) => <li key={i}>{p}</li>)}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* অবজেক্টিভস */}
-                      <div>
-                        <span className="font-bold text-amber-500 uppercase block mb-1.5 tracking-wider text-[10px] font-mono">
-                          {isEn ? 'EXPECTED LEARNING OBJECTIVES' : 'অর্জনযোগ্য উদ্দেশ্যসমূহ'}
-                        </span>
-                        <ul className="space-y-1 list-disc pl-4 text-slate-400">
-                          {item.learningObjectives.map((o, i) => <li key={i}>{o}</li>)}
-                        </ul>
-                      </div>
-
-                    </div>
-                  );
-                })()}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-slate-500 text-xs">
-                {isEn ? 'Analyzing assessment gaps...' : 'রোডম্যাপ তৈরি করা হচ্ছে...'}
-              </div>
-            )}
-          </Card>
-
-          {/* SECTION 3: LEARNING RESOURCES (প্রয়োজনীয় রিসোর্স লিংক) */}
-          <Card hoverEffect={false} id="section-learning-resources" className="border border-white/5 bg-slate-950/40">
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpenCheck className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white font-display">
-                {isEn ? 'Validated Resources' : 'যাচাইকৃত লার্নিং রিসোর্স'}
-              </h2>
-            </div>
-            <p className="text-slate-400 text-xs mb-4">
-              {isEn 
-                ? `Official learning pipelines mapped specifically for targeting your weakest skill: "${growthData?.weakestSkill || 'React'}"`
-                : `আপনার দুর্বলতা "${growthData?.weakestSkill || 'React'}" দূর করতে কাস্টম অফিসিয়াল ও ভেরিফাইড রিসোর্স লিংকসমূহ:`}
-            </p>
-
-            <div className="grid grid-cols-1 gap-2 text-xs">
-              
-              {/* ইউটিউব টিউটোরিয়াল */}
-              <a 
-                href={resourcesList.youtubeUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-rose-500/5 hover:border-rose-500/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-rose-500" />
-                  YouTube Video Tutorials
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-              {/* অফিসিয়াল ডকুমেন্টেশন */}
-              <a 
-                href={resourcesList.officialDocUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-cyan-500/5 hover:border-cyan-500/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                  Official Documentation
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-              {/* গিটহাব রিপোজিটরি */}
-              <a 
-                href={resourcesList.githubRepoUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-slate-400/5 hover:border-slate-400/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-slate-300" />
-                  GitHub Code Repositories
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-              {/* ফ্রি কোর্সসমূহ */}
-              <a 
-                href={resourcesList.freeCourseUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-emerald-500/5 hover:border-emerald-500/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  Free Courses (freeCodeCamp)
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-              {/* ডেভেলপমেন্ট ব্লগ */}
-              <a 
-                href={resourcesList.blogUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-amber-500/5 hover:border-amber-500/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  Dev.to Technical Blogs
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-              {/* প্র্যাকটিস ওয়েবসাইট */}
-              <a 
-                href={resourcesList.practiceWebsiteUrl} 
-                target="_blank" 
-                referrerPolicy="no-referrer"
-                className="flex items-center justify-between p-2.5 rounded-lg bg-white/5 hover:bg-purple-500/5 hover:border-purple-500/20 border border-white/5 transition-all text-slate-300 hover:text-white"
-              >
-                <span className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-purple-500" />
-                  Interactive Coding Playgrounds
-                </span>
-                <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              </a>
-
-            </div>
-          </Card>
-
-          {/* SECTION 6: NEXT INTERVIEW PREPARATION (পরবর্তী ভাইভার প্রস্তুতি) */}
-          <Card hoverEffect={false} id="section-next-interview" className="border border-white/5 bg-slate-950/40 text-xs">
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-white/5">
-              <Clock className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                {isEn ? 'AI Interview Predictive Analysis' : 'পরবর্তী ভাইভা অনুমান ও প্রস্তুতি'}
-              </h2>
-            </div>
-
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <span className="text-slate-400 font-medium block mb-1">{isEn ? 'Highly Likely Topics to Be Asked:' : 'প্রশ্ন করার উচ্চ সম্ভাবনা সম্পন্ন বিষয়সমূহ:'}</span>
-                <div className="flex flex-wrap gap-1.5">
-                  <Badge variant="brand">{growthData?.weakestSkill || 'React Hooks'}</Badge>
-                  <Badge variant="info">Async Operations</Badge>
-                  <Badge variant="warning">System optimization</Badge>
-                </div>
-              </div>
-
-              <div>
-                <span className="text-slate-400 font-medium block mb-1">{isEn ? 'Topics Needing More Practice:' : 'উন্নত অনুশীলনের পরামর্শকৃত বিষয়সমূহ:'}</span>
-                <ul className="list-disc pl-4 space-y-1 text-slate-300">
-                  <li>{growthData?.weakestSkill || 'React Hooks'} state constraints</li>
-                  <li>Efficient database indices and joins</li>
+                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                  <ArrowRight className="w-4 h-4 text-emerald-500" /> Short-term Focus
+                </h4>
+                <ul className="space-y-2 text-sm text-slate-400 pl-6 list-disc">
+                  {progress.aiSuggestions.shortTerm?.map((s,i) => <li key={i}>{s}</li>)}
                 </ul>
               </div>
-
-              <div className="grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
-                <div>
-                  <span className="text-slate-500 block text-[10px] uppercase font-mono">{isEn ? 'CONFIDENCE RATING' : 'আত্মবিশ্বাস মাত্রা'}</span>
-                  <span className="text-base font-bold text-cyan-400">75%</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px] uppercase font-mono">{isEn ? 'ESTIMATED READINESS' : 'প্রস্তুতি অনুমান'}</span>
-                  <span className="text-base font-bold text-emerald-400">{isEn ? 'Good (উত্তম)' : 'উত্তম'}</span>
-                </div>
+              <div>
+                <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                  <ArrowRight className="w-4 h-4 text-blue-500" /> Long-term Goals
+                </h4>
+                <ul className="space-y-2 text-sm text-slate-400 pl-6 list-disc">
+                  {progress.aiSuggestions.longTerm?.map((s,i) => <li key={i}>{s}</li>)}
+                </ul>
               </div>
+            </div>
+          </Card>
+
+          {/* Career Paths */}
+          <Card className="bg-slate-900 border-white/5 p-6">
+             <div className="flex items-center gap-2 mb-6">
+                <Map className="w-5 h-5 text-blue-400" />
+                <h2 className="text-lg font-bold text-white">Suggested Career Paths</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               {progress.careerPaths.map((cp, idx) => (
+                 <div key={idx} className="p-4 rounded-xl border border-white/5 bg-slate-950">
+                    <h3 className="font-bold text-emerald-400 mb-1">{cp.title}</h3>
+                    <p className="text-xs text-slate-400 mb-3">{cp.matchReason}</p>
+                    <div className="text-[10px] font-mono text-slate-500">
+                      Missing: {cp.missingSkills.join(', ')} <br/>
+                      Time: {cp.expectedLearningTime}
+                    </div>
+                 </div>
+               ))}
+            </div>
+          </Card>
+
+           {/* Project Recommendations */}
+           <Card className="bg-slate-900 border-white/5 p-6">
+             <div className="flex items-center gap-2 mb-6">
+                <Code className="w-5 h-5 text-amber-400" />
+                <h2 className="text-lg font-bold text-white">Project Recommendations</h2>
+            </div>
+            <div className="space-y-4">
+               {progress.projectRecommendations.map((pr, idx) => (
+                 <div key={idx} className="p-4 rounded-xl border border-white/5 bg-slate-950 flex flex-col md:flex-row gap-4 justify-between">
+                    <div>
+                      <h3 className="font-bold text-slate-200 mb-1 flex items-center gap-2">
+                        {pr.title}
+                        <Badge variant="outline" className="text-[10px] border-amber-500/30 text-amber-400">{pr.difficulty}</Badge>
+                      </h3>
+                      <p className="text-xs text-slate-400 mb-2">{pr.description}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {pr.requiredSkills.map(skill => (
+                          <span key={skill} className="px-1.5 py-0.5 rounded bg-white/5 text-[9px] font-mono text-slate-300">{skill}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right md:text-left mt-2 md:mt-0 text-[10px] font-mono text-slate-500">
+                      <Clock className="w-3 h-3 inline mr-1" /> {pr.estimatedTime}
+                    </div>
+                 </div>
+               ))}
             </div>
           </Card>
 
         </div>
 
-      </div>
-
-      {/* SECTION 7: SKILL ANALYTICS (রিয়েল চার্ট এনালাইসিস) */}
-      <Card hoverEffect={false} id="section-skill-analytics" className="border border-white/5 bg-slate-950/40">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-white/5">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-bold text-white font-display">
-              {isEn ? 'Skill & Assessment Analytics' : 'স্কিল এবং ইন্টারভিউ মূল্যায়ন চার্ট'}
-            </h2>
-          </div>
-          <div className="flex bg-white/5 p-1 rounded-xl text-xs font-semibold">
-            <button 
-              onClick={() => setAnalyticsTab('scores')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                analyticsTab === 'scores' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {isEn ? 'Overall Score Progress' : 'স্কোর অগ্রগতি'}
-            </button>
-            <button 
-              onClick={() => setAnalyticsTab('skills')}
-              className={`px-3 py-1.5 rounded-lg transition-all ${
-                analyticsTab === 'skills' ? 'bg-emerald-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              {isEn ? 'Metric Breakdown' : 'ডোমেইন অ্যানালিটিক্স'}
-            </button>
-          </div>
-        </div>
-
-        {chartData.length > 0 ? (
-          <div className="h-[280px] w-full font-mono text-[11px]">
-            <ResponsiveContainer width="100%" height="100%">
-              {analyticsTab === 'scores' ? (
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorOverall" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="date" stroke="#64748b" />
-                  <YAxis domain={[0, 100]} stroke="#64748b" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#090909', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
-                  />
-                  <Legend />
-                  <Area 
-                    name={isEn ? "Overall Interview Score" : "ভাইভা স্কোর"} 
-                    type="monotone" 
-                    dataKey="overall" 
-                    stroke="#10b981" 
-                    fillOpacity={1} 
-                    fill="url(#colorOverall)" 
-                    strokeWidth={2}
-                  />
-                </AreaChart>
-              ) : (
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="date" stroke="#64748b" />
-                  <YAxis domain={[0, 100]} stroke="#64748b" />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#090909', borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
-                  />
-                  <Legend />
-                  <Line 
-                    name={isEn ? "Technical Stack" : "কারিগরি দক্ষতা"} 
-                    type="monotone" 
-                    dataKey="technical" 
-                    stroke="#06b6d4" 
-                    strokeWidth={2} 
-                    dot={{ r: 4 }}
-                  />
-                  <Line 
-                    name={isEn ? "Communication" : "যোগাযোগ ও বাচনভঙ্গি"} 
-                    type="monotone" 
-                    dataKey="communication" 
-                    stroke="#a855f7" 
-                    strokeWidth={2} 
-                    dot={{ r: 4 }}
-                  />
-                  <Line 
-                    name={isEn ? "Confidence" : "আত্মবিশ্বাস মাত্রা"} 
-                    type="monotone" 
-                    dataKey="confidence" 
-                    stroke="#eab308" 
-                    strokeWidth={2} 
-                    dot={{ r: 4 }}
-                  />
-                </LineChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        ) : (
-          <div className="text-center py-12 text-slate-500 text-xs">
-            {isEn ? 'No analytics metrics found.' : 'অ্যানালিটিক্স চার্ট রেন্ডার করার জন্য পর্যাপ্ত হিস্টোরি ডেটা নেই।'}
-          </div>
-        )}
-      </Card>
-
-      {/* দুই কলাম: অ্যাচিভমেন্ট ও হিস্টোরি লগ / এআই রিকমেন্ডেশন (Two Columns: Achievements + AI Recommendations) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* SECTION 8: ACHIEVEMENTS (ডিজিটাল ব্যাজ ও অ্যাচিভমেন্টস) */}
-        <Card hoverEffect={false} id="section-achievements" className="border border-white/5 bg-slate-950/40">
-          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-white/5">
-            <Award className="w-5 h-5 text-emerald-400" />
-            <h2 className="text-xl font-bold text-white font-display">
-              {isEn ? 'Unlocked Achievements' : 'অর্জিত এআই ব্যাজসমূহ'}
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            {achievements.map((a) => {
-              const IconComponent = ICON_MAP[a.badgeIcon] || Award;
-              return (
-                <div 
-                  key={a.id}
-                  className={`p-4 rounded-xl border transition-all text-center flex flex-col items-center justify-center gap-2 relative ${
-                    a.unlocked 
-                      ? 'bg-emerald-500/5 border-emerald-500/20 text-white shadow-[0_0_15px_rgba(16,185,129,0.05)]' 
-                      : 'bg-white/2 border-white/5 opacity-50 text-slate-500'
-                  }`}
-                >
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                    a.unlocked ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/5 text-slate-600'
-                  }`}>
-                    <IconComponent className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold font-display line-clamp-1">{isEn ? a.titleEn : a.titleBn}</h4>
-                    <p className="text-[10px] text-slate-400 line-clamp-2 leading-tight mt-1">{isEn ? a.descriptionEn : a.descriptionBn}</p>
-                  </div>
-                  {a.unlocked && (
-                    <span className="absolute top-2 right-2 text-[9px] font-mono text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
-                      {isEn ? 'Unlocked' : 'অর্জিত'}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
-        {/* SECTION 9: AI RECOMMENDATIONS & HISTORY LOGS (এআই রিকমেন্ডেশন ও হিস্টোরি লগ) */}
+        {/* Right Column */}
         <div className="space-y-6">
           
-          {/* এআই রিকমেন্ডেশন */}
-          <Card hoverEffect={false} id="section-ai-recommendations" className="border border-white/5 bg-slate-950/40">
+          {/* Action Plan */}
+          <Card className="bg-slate-900 border-white/5 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-emerald-400" />
-              <h2 className="text-xl font-bold text-white font-display">
-                {isEn ? 'Assessed Recommendations' : 'এআই ব্যক্তিগত পরামর্শসমূহ'}
-              </h2>
+              <CheckSquare className="w-5 h-5 text-emerald-400" />
+              <h2 className="text-lg font-bold text-white">Action Plan</h2>
             </div>
-            <p className="text-slate-400 text-xs mb-4">
-              {isEn 
-                ? 'Actionable developmental directives processed dynamically from your real viva failures and notes'
-                : 'আপনার বাস্তব ভাইভাতে করা ভুলত্রুটি এবং মূল্যায়নের ওপর ভিত্তি করে সরাসরি এআই পরামর্শসমূহ:'}
-            </p>
-
-            <div className="space-y-2 text-xs">
+            
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Today's Tasks</h4>
+                <div className="space-y-2">
+                  {progress.actionPlan.today?.map(task => (
+                    <div key={task.id} className="flex items-start gap-3">
+                      <button onClick={() => handleTaskToggle('today', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500'}`}>
+                        {task.completed && <CheckCircle2 className="w-4 h-4 mx-auto" />}
+                      </button>
+                      <span className={`text-sm ${task.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{task.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
               
-              <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-slate-300">
-                <span className="font-bold text-emerald-400 block mb-1">
-                  💡 {isEn ? 'Enhance core skillsets' : 'প্রধান দক্ষতা বৃদ্ধি'}
-                </span>
-                {isEn 
-                  ? `Focus heavily on master topics regarding "${growthData?.weakestSkill || 'React Hooks'}". Learn standard error-handling structures.`
-                  : `আপনার "${growthData?.weakestSkill || 'React Hooks'}" বিষয়ের ওপর গভীর পড়াশোনা ও ডেকোরেটরস/হুকস এর ব্যবহার জানুন।`}
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">This Week</h4>
+                <div className="space-y-2">
+                  {progress.actionPlan.thisWeek?.map(task => (
+                    <div key={task.id} className="flex items-start gap-3">
+                      <button onClick={() => handleTaskToggle('thisWeek', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500'}`}>
+                        {task.completed && <CheckCircle2 className="w-4 h-4 mx-auto" />}
+                      </button>
+                      <span className={`text-sm ${task.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{task.text}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-
-              <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/10 text-slate-300">
-                <span className="font-bold text-cyan-400 block mb-1">
-                  🗣️ {isEn ? 'Communication Practice' : 'বাচনভঙ্গি ও প্রেজেন্টেশন'}
-                </span>
-                {isEn 
-                  ? 'Speak clearly during initial overview summaries. Avoid filler words and pause deliberately.'
-                  : 'প্রজেক্ট বর্ণনা করার সময় অপ্রাসঙ্গিক শব্দ পরিহার করুন এবং শান্তভাবে মূল পয়েন্টগুলো ব্যাখ্যা করুন।'}
-              </div>
-
-              <div className="p-3 rounded-lg bg-purple-500/5 border border-purple-500/10 text-slate-300">
-                <span className="font-bold text-purple-400 block mb-1">
-                  🛠️ {isEn ? 'Hands-on Coding tasks' : 'হাতে-কলমে কোডিং অনুশীলন'}
-                </span>
-                {isEn 
-                  ? 'Solve today\'s Coding Challenge. Write tests for modular helper functions.'
-                  : 'আজকের কোডিং চ্যালেঞ্জটি সমাধান করুন। ছোট মডিউলার ফাংশনগুলোর জন্য টেস্ট কেস লিখুন।'}
-              </div>
-
             </div>
           </Card>
 
-          {/* হিস্টোরি লগস */}
-          <Card hoverEffect={false} id="section-growth-history-logs" className="border border-white/5 bg-slate-950/40 text-xs">
-            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/5">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                {isEn ? 'Growth Activity Logs' : 'অগ্রগতি লগ ও টাইমলাইন'}
-              </h2>
+          {/* Learning Resources */}
+          <Card className="bg-slate-900 border-white/5 p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <BookOpen className="w-5 h-5 text-blue-400" />
+              <h2 className="text-lg font-bold text-white">Resources</h2>
             </div>
-
-            <div className="space-y-3 max-h-[160px] overflow-y-auto pr-1">
-              {historyLogs.map((log) => (
-                <div key={log.id} className="flex justify-between items-start gap-4 pb-2 border-b border-white/2">
-                  <div>
-                    <span className="font-semibold text-slate-300 block leading-tight">{log.changeDescription}</span>
-                    <span className="text-[10px] text-slate-500 font-mono mt-0.5 block">{log.eventName} • {log.date}</span>
+            <div className="space-y-3">
+              {progress.learningResources.map((res, idx) => (
+                <a key={idx} href={res.url || '#'} target="_blank" rel="noreferrer" className="block p-3 rounded-lg bg-slate-950 border border-white/5 hover:border-emerald-500/30 transition-colors">
+                  <div className="flex justify-between items-start mb-1">
+                    <span className="font-semibold text-sm text-emerald-400">{res.title}</span>
+                    <ExternalLink className="w-3 h-3 text-slate-500" />
                   </div>
-                  <span className="text-[10px] font-mono bg-white/5 px-2 py-0.5 rounded text-slate-400">
-                    {log.newValue}
-                  </span>
+                  <Badge variant="outline" className="text-[9px] mb-2">{res.type}</Badge>
+                  <p className="text-[10px] text-slate-400">{res.reason}</p>
+                </a>
+              ))}
+            </div>
+          </Card>
+
+          {/* AI Chat Coach */}
+          <Card className="bg-slate-900 border-white/5 p-0 overflow-hidden flex flex-col" style={{ height: '400px' }}>
+            <div className="p-4 border-b border-white/5 bg-slate-950/50 flex items-center gap-2">
+              <MessageSquareText className="w-5 h-5 text-purple-400" />
+              <h3 className="font-bold text-white">AI Coach Chat</h3>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/20">
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-sm text-slate-300">
+                Hi {user?.fullName}! I'm your AI Career Coach. Ask me anything about your roadmap, resume, or skills.
+              </div>
+              {chatMessages.map((msg, i) => (
+                <div key={i} className={`p-3 rounded-lg text-sm ${msg.role === 'user' ? 'bg-blue-500/10 border border-blue-500/20 text-blue-100 ml-4' : 'bg-slate-800 border border-white/5 text-slate-300 mr-4'}`}>
+                  {msg.text}
                 </div>
               ))}
-
-              {historyLogs.length === 0 && (
-                <div className="text-center py-4 text-slate-500">
-                  {isEn ? 'No logs recorded.' : 'কোনো টাইমলাইন রেকর্ড পাওয়া যায়নি।'}
+              {chatLoading && (
+                <div className="text-xs text-slate-500 flex items-center gap-2">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Coach is thinking...
                 </div>
               )}
+            </div>
+            <div className="p-3 border-t border-white/5 bg-slate-950/50">
+              <form onSubmit={(e) => { e.preventDefault(); handleChat(); }} className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={chatInput} 
+                  onChange={e => setChatInput(e.target.value)}
+                  placeholder="Ask a question..."
+                  className="flex-1 bg-slate-900 border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                />
+                <Button type="submit" disabled={!chatInput.trim() || chatLoading} className="px-3">
+                  <Play className="w-4 h-4" />
+                </Button>
+              </form>
             </div>
           </Card>
 
         </div>
-
       </div>
-
     </div>
   );
 };

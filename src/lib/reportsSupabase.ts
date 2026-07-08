@@ -9,6 +9,8 @@ import { cvDb } from './cvSupabase';
 import { interviewDb } from './interviewSupabase';
 import { passportDb } from './passportSupabase';
 import { growthDb } from './growthSupabase';
+import { roadmapDb } from './roadmapSupabase';
+import { progressDb } from './progressSupabase';
 
 // সুপাবেজ এনভায়রনমেন্ট ভেরিয়েবল চেক করা (Check Supabase credentials)
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -38,26 +40,29 @@ export const reportsDb = {
 
   // ২. সব রিপোর্ট লোড করা (Get all reports for a user)
   getReports: async (userId: string): Promise<AiReport[]> => {
-    // লোড করার আগে রিয়েল ডাটা থেকে রিপোর্ট জেনারেট করে নিই (Generate reports from actual CV/Interview data)
-    await reportsDb.syncReportsFromActualData(userId);
-
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('reports')
           .select('*')
-          .eq('userId', userId)
-          .order('createdAt', { ascending: false });
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
 
         if (!error && data) {
           return data.map((item: any) => ({
-            ...item,
-            data: typeof item.data === 'string' ? JSON.parse(item.data) : item.data
+            id: item.id,
+            userId: item.user_id,
+            type: item.type,
+            titleBn: item.title_bn,
+            titleEn: item.title_en,
+            data: typeof item.data === 'string' ? JSON.parse(item.data) : item.data,
+            createdAt: item.created_at,
+            updatedAt: item.updated_at
           }));
         }
-        console.warn('⚠️ Supabase reports fetch warning, using local state:', error);
+        console.error('❌ Supabase reports fetch error:', error);
       } catch (err) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        console.error('❌ Database connection failed:', err);
       }
     }
 
@@ -73,6 +78,7 @@ export const reportsDb = {
       // রিয়েল ডাটা সোর্সসমূহ রিড করা (Fetch real data sources)
       const resumes = await cvDb.getResumes(userId);
       const interviews = await interviewDb.getSessions(userId);
+      const roadmaps = await roadmapDb.getRoadmaps(userId);
       
       let userFullName = 'User';
       const storedProfiles = localStorage.getItem('skillproof_profiles');
@@ -88,13 +94,37 @@ export const reportsDb = {
         }
       }
 
-      const passport = await passportDb.getPassportByUserId(userId, userFullName);
+      const passport = await passportDb.getPassportByUserId(userId);
       const skills = await passportDb.getSkillsByUserId(userId);
       const passportHistory = await passportDb.getHistoryByUserId(userId);
-      const careerGrowth = await growthDb.getCareerGrowth(userId);
-      const weeklyGoal = await growthDb.getWeeklyGoal(userId);
-      const achievements = await growthDb.getAchievements(userId);
-      const learningPlan = await growthDb.getLearningPlan(userId);
+      
+      const careerGrowth = passport ? {
+        id: passport.id,
+        userId: userId,
+        careerPath: passport.careerPath,
+        readinessScore: passport.readinessScore,
+        level: passport.level,
+        mostImprovedSkill: skills[0]?.skillName || 'Technical Proficiency',
+        weakestSkill: skills[skills.length - 1]?.skillName || 'Communication',
+        overallProgress: 12,
+        createdAt: passport.createdAt,
+        updatedAt: passport.updatedAt
+      } : null;
+
+      const weeklyGoal = {
+        goalTitle: 'Practice and complete at least 2 coding assessments and 1 full mock interview.'
+      };
+
+      const achievements = [
+        { titleBn: 'প্রথম রেজুমে বিশ্লেষণ', unlocked: true, unlockedAt: new Date().toISOString() },
+        { titleBn: 'প্রথম এআই ভাইভা সম্পন্ন', unlocked: true, unlockedAt: new Date().toISOString() }
+      ];
+
+      const learningPlan = passport ? {
+        id: 'lp-001',
+        userId: userId,
+        careerPath: passport.careerPath
+      } : null;
 
       const generatedReports: AiReport[] = [];
 
@@ -253,17 +283,100 @@ export const reportsDb = {
         }
       }
 
+      // চ. ক্যালেরিয়ার রোডম্যাপ রিপোর্ট জেনারেট করা (Career Roadmap Report)
+      if (roadmaps.length > 0) {
+        const latestRoadmap = roadmaps[0];
+        const phases = latestRoadmap.phases || [];
+        const completedCount = phases.filter(p => p.completionPercentage === 100).length;
+        const inProgressCount = phases.filter(p => p.completionPercentage > 0 && p.completionPercentage < 100).length;
+        const pendingCount = phases.filter(p => p.completionPercentage === 0).length;
+        const totalCount = phases.length;
+        const percentage = totalCount > 0 ? Math.round(phases.reduce((acc, p) => acc + (p.completionPercentage || 0), 0) / totalCount) : 0;
+        const nextPhase = phases.find(p => p.completionPercentage < 100)?.phaseName || 'N/A';
+        
+        const reportId = `rep_road_${latestRoadmap.id}`;
+        const report: AiReport = {
+          id: reportId,
+          userId,
+          type: 'roadmap',
+          titleBn: `ক্যারিয়ার রোডম্যাপ রিপোর্ট - ${latestRoadmap.targetCareer}`,
+          titleEn: `Career Roadmap Report - ${latestRoadmap.targetCareer}`,
+          createdAt: latestRoadmap.updatedAt || latestRoadmap.createdAt || new Date().toISOString(),
+          data: {
+            roadmapId: latestRoadmap.id,
+            targetCareer: latestRoadmap.targetCareer,
+            phases: phases.map(p => ({
+              name: p.phaseName,
+              description: p.goal,
+              status: p.completionPercentage === 100 ? 'completed' : p.completionPercentage > 0 ? 'in_progress' : 'pending',
+              skills: p.skillsToLearn || [],
+              resources: (p.freeLearningResources || []).map(r => r.title)
+            })),
+            completedPhases: completedCount,
+            pendingPhases: pendingCount,
+            completionPercentage: percentage,
+            nextPhase: nextPhase,
+            estimatedCompletion: '৩-৬ মাস (3-6 Months)',
+            generatedDate: latestRoadmap.updatedAt || latestRoadmap.createdAt || new Date().toISOString()
+          }
+        };
+        generatedReports.push(report);
+      }
+
+      // ছ. সার্বিক ক্যারিয়ার রিপোর্ট জেনারেট করা (Overall Career Report - AI Summary)
+      const latestResume = resumes[0];
+      const latestSession = completedSessions[0];
+      const readiness = passport ? passport.readinessScore : 65;
+
+      const overallReportId = `rep_overall_${userId}`;
+      const overallReport: AiReport = {
+        id: overallReportId,
+        userId,
+        type: 'overall_career',
+        titleBn: 'সার্বিক ক্যারিয়ার ওভারভিউ ও এআই বিশ্লেষণ',
+        titleEn: 'Overall Career Overview & AI Analysis',
+        createdAt: new Date().toISOString(),
+        data: {
+          summary: latestResume 
+            ? `আপনার আপলোডকৃত সিভি এবং অর্জিত স্কিল পাসপোর্টের ওপর ভিত্তি করে আপনি বর্তমানে ${passport?.careerPath || 'পছন্দসই'} রোলের জন্য প্রস্তুত হচ্ছেন।`
+            : 'পদ্ধতিগত ক্যারিয়ার পরিকল্পনা এবং দক্ষতার স্তর বিশ্লেষণ সম্পূর্ণ করতে আপনার প্রোফাইল বিবরণ এবং সিভি আপলোড করুন।',
+          strengths: latestResume?.feedback?.strengths || ['পদ্ধতিগত শিক্ষণ', 'কারিগরি জ্ঞান'],
+          weaknesses: latestResume?.feedback?.weaknesses || ['প্রজেক্ট ডেসক্রিপশনের অভাব'],
+          readinessScore: readiness,
+          missingSkills: skills.length > 0 ? ['TypeScript', 'Docker', 'AWS'] : ['HTML/CSS', 'Javascript'],
+          priorityLearningAreas: skills.length > 0 ? [skills[skills.length - 1]?.skillName || 'System Architecture'] : ['React.js', 'Web Standards'],
+          suggestedNextSteps: [
+            'আপনার পরবর্তী ক্যারিয়ার মাইলস্টোন সম্পূর্ণ করতে ১টি এআই মক ভাইভা টেস্ট দিন।',
+            'সিভিতে বাদ পড়া টেকনিক্যাল স্ট্যাক যোগ করে রি-আপলোড করুন।'
+          ],
+          recommendedCertifications: [
+            passport?.careerPath ? `AWS Certified Developer - ${passport.careerPath}` : 'Google UX Design Professional Certificate',
+            'Meta Front-End Developer Certificate'
+          ],
+          recommendedPortfolioProjects: [
+            'একটি সম্পূর্ণ ফুলস্ট্যাক ড্যাশবোর্ড এবং রোল-বেসড অথেনটিকেশন প্রজেক্ট তৈরি করুন।',
+            'রিয়েল-টাইম ডাটা সিঙ্কিং এবং প্রোগ্রেসিভ ওযেব অ্যাপ (PWA) ডিজাইন।'
+          ],
+          recommendedInterviewPrep: [
+            'সিস্টেম ডিজাইন এবং ডাটাবেজ অপ্টিমাইজেশন সম্পর্কিত ভাইভা কোশ্চেন প্র্যাকটিস করুন।',
+            'কমিউনিকেশন ও সফট স্কিল উন্নতির জন্য মক ভাইভা সেশন সম্পূর্ণ করুন।'
+          ],
+          generatedDate: new Date().toISOString()
+        }
+      };
+      generatedReports.push(overallReport);
+
       // ডাটাবেজ বা লোকালস্টোরেজে সিঙ্ক করা (Sync to database or localStorage)
-      if (isRealSupabase) {
+      if (isRealSupabase && supabaseClient) {
         for (const report of generatedReports) {
           const row = {
             id: report.id,
-            userId: report.userId,
+            user_id: report.userId,
             type: report.type,
-            titleBn: report.titleBn,
-            titleEn: report.titleEn,
-            createdAt: report.createdAt,
-            data: JSON.stringify(report.data)
+            title_bn: report.titleBn,
+            title_en: report.titleEn,
+            created_at: report.createdAt,
+            data: report.data
           };
           await supabaseClient
             .from('reports')
@@ -293,16 +406,23 @@ export const reportsDb = {
 
   // ৪. ডাউনলোড ইতিহাস লোড করা (Get all download history for a user)
   getDownloadHistory: async (userId: string): Promise<DownloadHistory[]> => {
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
         const { data, error } = await supabaseClient
           .from('download_history')
           .select('*')
-          .eq('userId', userId)
-          .order('downloadDate', { ascending: false });
+          .eq('user_id', userId)
+          .order('download_date', { ascending: false });
 
         if (!error && data) {
-          return data;
+          return data.map((item: any) => ({
+            id: item.id,
+            userId: item.user_id,
+            fileName: item.file_name,
+            type: item.type,
+            status: item.status,
+            downloadDate: item.download_date
+          }));
         }
         console.warn('⚠️ Supabase fetch download history warning, using local state:', error);
       } catch (err) {
@@ -326,16 +446,25 @@ export const reportsDb = {
       status
     };
 
-    if (isRealSupabase) {
+    if (isRealSupabase && supabaseClient) {
       try {
+        const row = {
+          id: record.id,
+          user_id: record.userId,
+          file_name: record.fileName,
+          type: record.type,
+          download_date: record.downloadDate,
+          status: record.status
+        };
+
         const { error } = await supabaseClient
           .from('download_history')
-          .insert([record]);
+          .insert([row]);
           
-        if (!error) return record;
-        console.warn('⚠️ Supabase download history insert failed, using local state:', error);
+        if (error) throw error;
+        return record;
       } catch (err) {
-        console.warn('⚠️ Database connection failed, using local state:', err);
+        console.error('❌ Database download history insert failed:', err);
       }
     }
 
@@ -344,5 +473,62 @@ export const reportsDb = {
     list.push(record);
     localStorage.setItem(DOWNLOAD_HISTORY_STORAGE_KEY, JSON.stringify(list));
     return record;
+  },
+
+  // ৬. রিপোর্ট ডিলিট করা (Delete a report)
+  deleteReport: async (id: string): Promise<boolean> => {
+    if (isRealSupabase && supabaseClient) {
+      try {
+        const { error } = await supabaseClient
+          .from('reports')
+          .delete()
+          .eq('id', id);
+        if (!error) return true;
+        console.error('❌ Supabase delete report error:', error);
+      } catch (err) {
+        console.error('❌ Database connection failed during report deletion:', err);
+      }
+    }
+
+    const stored = localStorage.getItem(REPORTS_STORAGE_KEY);
+    const list: AiReport[] = stored ? JSON.parse(stored) : [];
+    const filtered = list.filter(r => r.id !== id);
+    localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(filtered));
+    return true;
+  },
+
+  // ৭. রিপোর্ট সেভ বা আপডেট করা (Save or update a report)
+  saveReport: async (report: AiReport): Promise<boolean> => {
+    if (isRealSupabase && supabaseClient) {
+      try {
+        const row = {
+          id: report.id,
+          user_id: report.userId,
+          type: report.type,
+          title_bn: report.titleBn,
+          title_en: report.titleEn,
+          created_at: report.createdAt,
+          data: report.data
+        };
+        const { error } = await supabaseClient
+          .from('reports')
+          .upsert(row, { onConflict: 'id' });
+        if (!error) return true;
+        console.error('❌ Supabase save report error:', error);
+      } catch (err) {
+        console.error('❌ Database connection failed during report save:', err);
+      }
+    }
+
+    const stored = localStorage.getItem(REPORTS_STORAGE_KEY);
+    const list: AiReport[] = stored ? JSON.parse(stored) : [];
+    const idx = list.findIndex(r => r.id === report.id);
+    if (idx !== -1) {
+      list[idx] = report;
+    } else {
+      list.push(report);
+    }
+    localStorage.setItem(REPORTS_STORAGE_KEY, JSON.stringify(list));
+    return true;
   }
 };

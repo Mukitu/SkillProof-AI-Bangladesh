@@ -26,6 +26,11 @@ export interface UserProfile {
     department?: string;
     semester?: string;
     bio?: string;
+    username?: string;
+    dob?: string;
+    gender?: string;
+    country?: string;
+    city?: string;
   };
   address?: string;
   university?: string;
@@ -35,6 +40,11 @@ export interface UserProfile {
   github?: string;
   portfolio?: string;
   bio?: string;
+  username?: string;
+  dob?: string;
+  gender?: string;
+  country?: string;
+  city?: string;
   createdAt: string;
 }
 

@@ -70,38 +70,43 @@ You MUST return ONLY a raw JSON object with the following schema (no markdown wr
   "resumeScore": number (30-100, estimate based on completeness)
 }`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const response = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
           temperature: 0.2,
-          max_tokens: 500,
-        });
-        const content = response.choices[0]?.message?.content;
-        if (content) {
-          let cleanJson = content.trim();
-          if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-          }
-          const res = JSON.parse(cleanJson);
-          if (res.careerPath && res.skills) {
-            return {
-              careerPath: res.careerPath,
-              skills: res.skills,
-              readinessScore: res.readinessScore || 75,
-              duration: res.duration || '20 Minutes',
-              resumeScore: res.resumeScore || 80
-            };
-          }
+          max_tokens: 500
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (content) {
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
-        throw new Error('Invalid JSON format from AI');
-      } catch (err: any) {
-        console.error('Groq career detection failed:', err);
-        throw new Error('Failed to analyze CV for interview using AI: ' + err.message);
+        const res = JSON.parse(cleanJson);
+        if (res.careerPath && res.skills) {
+          return {
+            careerPath: res.careerPath,
+            skills: res.skills,
+            readinessScore: res.readinessScore || 75,
+            duration: res.duration || '20 Minutes',
+            resumeScore: res.resumeScore || 80
+          };
+        }
       }
+      throw new Error('Invalid JSON format from AI');
+    } catch (err: any) {
+      console.error('Groq career detection failed:', err);
+      throw new Error('Failed to analyze CV for interview using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ২. প্রথম প্রশ্ন জেনারেট করা (Generate first ice-breaker question)
@@ -136,22 +141,27 @@ The first question should be an engaging, professional ice-breaker that welcomes
 
 Keep the tone extremely polite, corporate yet encouraging. Respond ONLY with the question itself. Output in English.`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const response = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
           temperature: 0.7,
-          max_tokens: 150,
-        });
-        const content = response.choices[0]?.message?.content;
-        if (content) return content.trim();
-      } catch (err: any) {
-        console.error('Groq first question failed:', err);
-        throw new Error('Failed to generate interview question using AI: ' + err.message);
-      }
+          max_tokens: 150
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      if (content) return content.trim();
+      throw new Error('No content returned from AI');
+    } catch (err: any) {
+      console.error('Groq first question failed:', err);
+      throw new Error('Failed to generate interview question using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৩. উত্তর বিশ্লেষণ করা এবং পরবর্তী বুদ্ধিদীপ্ত প্রশ্ন জেনারেট করা (Process answer and generate dynamic follow-up)
@@ -241,37 +251,42 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
   }
 }`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const response = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
           temperature: 0.5,
-          max_tokens: 800,
-        });
-        const content = response.choices[0]?.message?.content;
-        if (content) {
-          let cleanJson = content.trim();
-          if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-          }
-          const res = JSON.parse(cleanJson);
-          if (res.nextQuestion && res.answerScores) {
-            return {
-              nextQuestion: res.nextQuestion,
-              nextCategory: res.nextCategory || 'Technical',
-              answerScores: res.answerScores,
-              answerFeedback: res.answerFeedback || 'Excellent points raised. Let us expand on that further.'
-            };
-          }
+          max_tokens: 800
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (content) {
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
-        throw new Error('Invalid JSON format from AI');
-      } catch (err: any) {
-        console.error('Groq next question generation failed:', err);
-        throw new Error('Failed to process answer and generate next question using AI: ' + err.message);
+        const res = JSON.parse(cleanJson);
+        if (res.nextQuestion && res.answerScores) {
+          return {
+            nextQuestion: res.nextQuestion,
+            nextCategory: res.nextCategory || 'Technical',
+            answerScores: res.answerScores,
+            answerFeedback: res.answerFeedback || 'Excellent points raised. Let us expand on that further.'
+          };
+        }
       }
+      throw new Error('Invalid JSON format from AI');
+    } catch (err: any) {
+      console.error('Groq next question generation failed:', err);
+      throw new Error('Failed to process answer and generate next question using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৪. শেষ রিভিউ ও ওভারঅল স্কোর জেনারেট করা (Generate overall interview summary at the end)
@@ -331,32 +346,37 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
   }
 }`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const response = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
           temperature: 0.3,
-          max_tokens: 1200,
-        });
-        const content = response.choices[0]?.message?.content;
-        if (content) {
-          let cleanJson = content.trim();
-          if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-          }
-          const res = JSON.parse(cleanJson);
-          if (res.scores && res.feedback) {
-            return res;
-          }
+          max_tokens: 1200
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (content) {
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
-        throw new Error('Invalid JSON format from AI');
-      } catch (err: any) {
-        console.error('Groq final evaluation failed:', err);
-        throw new Error('Failed to generate interview summary using AI: ' + err.message);
+        const res = JSON.parse(cleanJson);
+        if (res.scores && res.feedback) {
+          return res;
+        }
       }
+      throw new Error('Invalid JSON format from AI');
+    } catch (err: any) {
+      console.error('Groq final evaluation failed:', err);
+      throw new Error('Failed to generate interview summary using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   },
 
   // ৫. সম্পূর্ণ হিস্ট্রি বিশ্লেষণ করে এডাপ্টিভ মেমোরি জেনারেট করা (Compile consolidated adaptive memory from history)
@@ -422,64 +442,69 @@ You MUST return ONLY a raw JSON object matching the following schema (no markdow
   "aiInsights": ["string"]
 }`;
 
-    if (isRealGroq && groqClient) {
-      try {
-        const response = await groqClient.chat.completions.create({
-          messages: [{ role: 'user', content: prompt }],
+    try {
+      const response = await fetch('/api/ai/groq', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
           model: MODEL_NAME,
           temperature: 0.3,
-          max_tokens: 1500,
-        });
-        const content = response.choices[0]?.message?.content;
-        if (content) {
-          let cleanJson = content.trim();
-          if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-          }
-          const res = JSON.parse(cleanJson);
-          return {
-            id: latestSession.id + '_memory',
-            userId,
-            weakTopics: res.weakTopics || [],
-            strongTopics: res.strongTopics || [],
-            previousQuestions: res.previousQuestions || [],
-            previousMistakes: res.previousMistakes || [],
-            improvementHistory: [latestSession, ...historySessions].map(s => ({
-              sessionId: s.id,
-              date: new Date(s.createdAt).toLocaleDateString(),
-              overallScore: s.scores?.overall || 70,
-              technicalScore: s.scores?.technical || 70,
-              communicationScore: s.scores?.communication || 70
-            })).reverse(),
-            learningSuggestions: res.learningSuggestions || [],
-            readinessExplanation: res.readinessExplanation || '',
-            readinessScore: res.readinessScore || 70,
-            studyPlan: res.studyPlan || {
-              todayGoal: '',
-              weekGoal: '',
-              nextInterviewGoal: '',
-              practiceTasks: [],
-              miniProjects: [],
-              practiceQuestions: []
-            },
-            metrics: res.metrics || {
-              mostImprovedSkill: '',
-              mostDifficultSkill: '',
-              mostRepeatedMistake: '',
-              fastestGrowingSkill: '',
-              currentWeakAreas: [],
-              currentStrongAreas: []
-            },
-            aiInsights: res.aiInsights || [],
-            lastUpdated: new Date().toISOString()
-          };
+          max_tokens: 1500
+        })
+      });
+      
+      if (!response.ok) throw new Error('AI Proxy request failed');
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (content) {
+        let cleanJson = content.trim();
+        if (cleanJson.startsWith('```')) {
+          cleanJson = cleanJson.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         }
-        throw new Error('Invalid JSON format from AI');
-      } catch (err: any) {
-        console.error('Groq compile memory failed:', err);
-        throw new Error('Failed to compile memory using AI: ' + err.message);
+        const res = JSON.parse(cleanJson);
+        return {
+          id: latestSession.id + '_memory',
+          userId,
+          weakTopics: res.weakTopics || [],
+          strongTopics: res.strongTopics || [],
+          previousQuestions: res.previousQuestions || [],
+          previousMistakes: res.previousMistakes || [],
+          improvementHistory: [latestSession, ...historySessions].map(s => ({
+            sessionId: s.id,
+            date: new Date(s.createdAt).toLocaleDateString(),
+            overallScore: s.scores?.overall || 70,
+            technicalScore: s.scores?.technical || 70,
+            communicationScore: s.scores?.communication || 70
+          })).reverse(),
+          learningSuggestions: res.learningSuggestions || [],
+          readinessExplanation: res.readinessExplanation || '',
+          readinessScore: res.readinessScore || 70,
+          studyPlan: res.studyPlan || {
+            todayGoal: '',
+            weekGoal: '',
+            nextInterviewGoal: '',
+            practiceTasks: [],
+            miniProjects: [],
+            practiceQuestions: []
+          },
+          metrics: res.metrics || {
+            mostImprovedSkill: '',
+            mostDifficultSkill: '',
+            mostRepeatedMistake: '',
+            fastestGrowingSkill: '',
+            currentWeakAreas: [],
+            currentStrongAreas: []
+          },
+          aiInsights: res.aiInsights || [],
+          lastUpdated: new Date().toISOString()
+        };
       }
+      throw new Error('Invalid JSON format from AI');
+    } catch (err: any) {
+      console.error('Groq compile memory failed:', err);
+      throw new Error('Failed to compile memory using AI: ' + err.message);
     }
-    throw new Error('Groq API Key is not configured. Please add VITE_GROQ_API_KEY in the environment.');
   }
 };

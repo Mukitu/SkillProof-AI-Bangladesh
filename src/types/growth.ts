@@ -111,3 +111,83 @@ export interface LearningResource {
   blogUrl: string;
   practiceWebsiteUrl: string;
 }
+
+export interface CareerProgressData {
+    id: string;
+    userId: string;
+    overallScore: number;
+    resumeScore: number;
+    atsScore: number;
+    interviewScore: number;
+    skillScore: number;
+    profileCompletion: number;
+    strengths: StrengthItem[];
+    weaknesses: WeaknessItem[];
+    jobReadiness: 'Not Ready' | 'Beginner' | 'Intermediate' | 'Job Ready' | 'Highly Competitive';
+    readinessReason: string;
+    aiSuggestions: AISuggestions;
+    learningResources: AILearningResource[];
+    projectRecommendations: ProjectRecommendation[];
+    careerPaths: CareerPathSuggestion[];
+    actionPlan: ActionPlan;
+    lastGenerated: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface StrengthItem {
+    name: string;
+    category: 'Technical' | 'Soft Skill' | 'Communication' | 'Leadership' | 'Problem Solving';
+    confidence: number;
+}
+
+export interface WeaknessItem {
+    name: string;
+    category: 'Missing Skill' | 'Technical' | 'Soft Skill' | 'Resume' | 'Interview';
+    priority: 'High' | 'Medium' | 'Low';
+}
+
+export interface AISuggestions {
+    shortTerm: string[];
+    longTerm: string[];
+    resume: string[];
+    interview: string[];
+    portfolio: string[];
+    linkedin: string[];
+    github: string[];
+}
+
+export interface AILearningResource {
+    title: string;
+    url?: string;
+    type: string;
+    reason: string;
+}
+
+export interface ProjectRecommendation {
+    title: string;
+    description: string;
+    requiredSkills: string[];
+    estimatedTime: string;
+    difficulty: 'Beginner' | 'Intermediate' | 'Advanced';
+}
+
+export interface CareerPathSuggestion {
+    title: string;
+    matchReason: string;
+    missingSkills: string[];
+    expectedLearningTime: string;
+}
+
+export interface ActionPlan {
+    today: TaskItem[];
+    thisWeek: TaskItem[];
+    thisMonth: TaskItem[];
+    priorityChecklist: TaskItem[];
+}
+
+export interface TaskItem {
+    id: string;
+    text: string;
+    completed: boolean;
+}
