@@ -153,7 +153,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
   // ==========================================
 
   const startNewCv = () => {
-    const newId = 'cv_' + Math.random().toString(36).substr(2, 9);
+    const newId = crypto.randomUUID();
     setWizardCv({
       id: newId,
       userId,
@@ -452,7 +452,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
     // হিস্ট্রি সেভ করি (Save improvement history)
     const historyItem: CvImprovementHistory = {
-      id: 'hist_' + Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       cvId: wizardCv.id!,
       section,
       sectionItemId: itemId,
@@ -485,7 +485,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
     // রিজেক্ট হিস্ট্রি ট্র্যাকিং (Save history as rejected)
     const historyItem: CvImprovementHistory = {
-      id: 'hist_' + Math.random().toString(36).substr(2, 9),
+      id: crypto.randomUUID(),
       cvId: wizardCv.id!,
       section: comparison.section,
       sectionItemId: comparison.itemId,
@@ -627,7 +627,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
       setUploadProgress(95);
 
       // ৩. সিভি অবজেক্ট ডাটাবেজ-এ সেভ করা (Save analysis CvData to Supabase/localStorage)
-      const generatedId = 'cv_' + Math.random().toString(36).substr(2, 9);
+      const generatedId = crypto.randomUUID();
       const newCvData: CvData = {
         id: generatedId,
         userId,

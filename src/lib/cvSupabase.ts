@@ -183,7 +183,7 @@ export const cvDb = {
         const { data: files } = await supabaseClient
           .from('cv_files_metadata')
           .select('*')
-          .eq('userId', userId);
+          .eq('user_id', userId);
         
         if (files && files.length > 0) {
           const filePaths = files.map((f: any) => {
@@ -205,7 +205,7 @@ export const cvDb = {
         await supabaseClient
           .from('cv_files_metadata')
           .delete()
-          .eq('userId', userId);
+          .eq('user_id', userId);
       } catch (err) {
         console.warn('⚠️ cv_files_metadata deletion warning:', err);
       }
@@ -216,7 +216,7 @@ export const cvDb = {
           .from('interview_sessions')
           .delete()
           .eq('cvId', id)
-          .eq('userId', userId);
+          .eq('user_id', userId);
       } catch (err) {
         console.warn('⚠️ interview_sessions deletion warning:', err);
       }
@@ -237,7 +237,7 @@ export const cvDb = {
           .from('cv_resumes')
           .delete()
           .eq('id', id)
-          .eq('userId', userId);
+          .eq('user_id', userId);
 
         if (error) {
           console.error('❌ Core cv_resumes deletion error:', error);
@@ -303,7 +303,7 @@ export const cvDb = {
             upsert: true
           });
 
-        // বাকেট না থাকলে বা পারমিশন না থাকলে এরর হ্যান্ডলিং
+        // বাকেট না থাকলে বা পারমিশন না থাকলে বেস৬৪ এ ফলব্যাক করা
         if (uploadError && (
           uploadError.message?.includes('not found') || 
           uploadError.message?.includes('Bucket') || 
@@ -311,28 +311,35 @@ export const cvDb = {
           uploadError.message?.includes('violates row-level security policy') ||
           (uploadError as any).status === 404
         )) {
-          console.error('❌ Supabase Storage Error:', uploadError.message);
-          throw new Error('সুপাবেজ স্টোরেজে "cv_storage" বাকেটটি তৈরি করা নেই অথবা পারমিশন নেই। দয়া করে সুপাবেজ ড্যাশবোর্ড থেকে "cv_storage" নামে একটি Public Bucket তৈরি করুন এবং RLS পলিসি চেক করুন। (Storage bucket "cv_storage" not found or RLS policy violation. Please create a public bucket named "cv_storage" in your Supabase dashboard.)');
-        }
-
-        if (uploadError) {
+          console.warn('⚠️ cv_storage bucket issue, falling back to Base64...');
+          
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          
+          publicUrl = base64;
+          
+        } else if (uploadError) {
           throw new Error(`Storage upload error: ${uploadError.message}`);
+        } else {
+          // ২. পাবলিক ইউআরএল জেনারেট করা (Retrieve public URL)
+          const { data } = supabaseClient.storage
+            .from('cv_storage')
+            .getPublicUrl(filePath);
+
+          publicUrl = data?.publicUrl || '';
         }
-
-        // ২. পাবলিক ইউআরএল জেনারেট করা (Retrieve public URL)
-        const { data } = supabaseClient.storage
-          .from('cv_storage')
-          .getPublicUrl(filePath);
-
-        publicUrl = data?.publicUrl || '';
 
         // ৩. মেটাডাটা টেবিলে সংরক্ষণ করা (Save upload metadata)
         const metadataRow = {
-          userId,
-          fileName: file.name,
-          fileSize: file.size,
-          fileUrl: publicUrl,
-          uploadedAt: new Date().toISOString()
+          user_id: userId,
+          file_name: file.name,
+          file_size: file.size,
+          file_url: publicUrl,
+          uploaded_at: new Date().toISOString()
         };
 
         const { error: metaError } = await supabaseClient
@@ -358,7 +365,7 @@ export const cvDb = {
     // লোকাল ফলব্যাক (Local fallback)
     const mockUrl = URL.createObjectURL(file);
     const metadataRow = {
-      userId,
+      user_id: userId,
       fileName: file.name,
       fileSize: file.size,
       fileUrl: mockUrl,

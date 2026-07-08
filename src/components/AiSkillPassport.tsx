@@ -36,8 +36,8 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
     try {
       let p = await passportDb.getPassportByUserId(user.id);
       
-      // যদি পাসপোর্ট না থাকে বা ফোর্স সিঙ্ক করতে হয়
-      if (!p || forceSync) {
+      // যদি পাসপোর্ট না থাকে বা ফোর্স সিঙ্ক করতে হয়, অথবা নাম/ছবি আপডেট হয়
+      if (!p || forceSync || p.fullName !== user.fullName || p.avatarUrl !== user.avatarUrl) {
         p = await passportDb.syncPassport(user.id, user);
       }
       
@@ -178,6 +178,7 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
 
       {/* ১. পাসপোর্ট সার্টিফিকেট ডিজাইন */}
       <div 
+        id="cv-print-area"
         ref={cardRef}
         className="bg-white text-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border-8 border-emerald-50/50 relative print:shadow-none print:border-none"
       >
@@ -208,9 +209,10 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
           <div className="lg:col-span-4 flex flex-col items-center text-center gap-4">
             <div className="relative group">
               <img 
-                src={passport.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'} 
+                src={user?.avatarUrl || passport.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'} 
                 alt="Avatar" 
                 className="w-48 h-48 rounded-[2rem] object-cover border-4 border-white shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]"
+                crossOrigin="anonymous"
                 referrerPolicy="no-referrer"
               />
               <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-white px-4 py-1.5 rounded-full shadow-lg border border-emerald-100 flex items-center gap-2">
@@ -219,7 +221,7 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
               </div>
             </div>
             <div className="mt-4">
-              <h2 className="text-2xl font-black text-slate-900 leading-tight">{passport.fullName}</h2>
+              <h2 className="text-2xl font-black text-slate-900 leading-tight">{user?.fullName || passport.fullName}</h2>
               <p className="text-emerald-600 font-bold text-sm mt-1">{passport.careerPath}</p>
             </div>
             <div className="w-full h-[1px] bg-slate-100 my-2" />
