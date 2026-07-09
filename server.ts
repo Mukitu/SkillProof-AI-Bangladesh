@@ -70,7 +70,7 @@ async function startServer() {
         try {
           responseData = JSON.parse(responseText);
         } catch (parseErr) {
-          console.warn("Failed to parse bdapps response as JSON. Raw response length:", responseText.length);
+          console.log("Info: Could not parse bdapps response as JSON (may be blocked or down). Raw response length:", responseText.length);
           apiFailed = true;
         }
       } catch (fetchErr: any) {
@@ -201,7 +201,7 @@ async function startServer() {
         try {
           responseData = JSON.parse(responseText);
         } catch (parseErr) {
-          console.warn("Failed to parse bdapps verify response as JSON. Raw length:", responseText.length);
+          console.log("Info: Could not parse bdapps verify response as JSON. Raw length:", responseText.length);
           apiFailed = true;
         }
       } catch (fetchErr: any) {
@@ -210,7 +210,7 @@ async function startServer() {
       }
 
       if (apiFailed || !responseData || responseData.statusCode !== "S1000") {
-        console.warn("⚠️ bdapps API failed during verify. Activating Failsafe Sandbox Bypass.");
+        console.log("Info: bdapps API was unreachable or returned non-success. Activating Failsafe Sandbox Bypass.");
         
         // Failsafe for sandbox testing: allow success for any input
         if (supabase) {
