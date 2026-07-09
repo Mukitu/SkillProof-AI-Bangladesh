@@ -76,8 +76,8 @@ export default async function handler(req: any, res: any) {
       apiFailed = true;
     }
 
-    // If the API call failed (IP blocked, Cloudflare wall, or network timeout/unreachable)
-    if (apiFailed || !responseData || responseData.statusCode !== "S1000") {
+    // If the API call physically failed (network error, timeout, or non-JSON HTML block)
+    if (apiFailed || !responseData) {
       console.log("⚠️ bdapps API is unreachable, blocked, or returned HTML. Falling back to Sandbox Simulation Mode for testing!");
       
       // Generate simulated reference number
@@ -87,14 +87,31 @@ export default async function handler(req: any, res: any) {
         success: true,
         referenceNo: simulatedRef,
         isSimulated: true,
-        statusDetail: "Running in bdapps Sandbox Simulation Mode (External API unreachable or firewalled)"
+        statusDetail: "Running in bdapps Sandbox Simulation Mode (External API unreachable or firewalled)",
+        debugInfo: {
+          apiFailed,
+          rawResponseLength: responseText ? responseText.length : 0,
+          rawResponseSnippet: responseText ? responseText.substring(0, 200) : "No response content"
+        }
       });
     }
 
-    // Return real response to client
+    // If the API returned a real JSON response but with a non-success status code (e.g. E1313, E1856)
+    if (responseData.statusCode !== "S1000") {
+      return res.json({
+        success: false,
+        error: responseData.statusDetail || `BDApps error: ${responseData.statusCode}`,
+        statusCode: responseData.statusCode,
+        isSimulated: false,
+        referenceNo: responseData.referenceNo
+      });
+    }
+
+    // Return real success response to client
     return res.json({
       success: true,
       referenceNo: responseData.referenceNo,
+      isSimulated: false,
       statusDetail: responseData.statusDetail
     });
   } catch (err: any) {

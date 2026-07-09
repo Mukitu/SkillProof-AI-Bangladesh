@@ -135,8 +135,8 @@ export default async function handler(req: any, res: any) {
       apiFailed = true;
     }
 
-    if (apiFailed || !responseData || responseData.statusCode !== "S1000") {
-      console.log("Info: bdapps API was unreachable or returned non-success. Activating Failsafe Sandbox Bypass.");
+    if (apiFailed || !responseData) {
+      console.log("Info: bdapps API was unreachable or blocked. Activating Failsafe Sandbox Bypass.");
       
       // Failsafe for sandbox testing: allow success for any input
       if (supabase) {
@@ -184,6 +184,14 @@ export default async function handler(req: any, res: any) {
         subscriberId: subscriberId,
         subscriptionStatus: "REGISTERED",
         statusDetail: "Failsafe subscription activated (External API was unreachable)"
+      });
+    }
+
+    if (responseData.statusCode !== "S1000") {
+      return res.status(400).json({
+        success: false,
+        error: responseData.statusDetail || "Invalid OTP code",
+        statusCode: responseData.statusCode
       });
     }
 

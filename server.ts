@@ -78,8 +78,8 @@ async function startServer() {
         apiFailed = true;
       }
 
-      // If the API call failed (IP blocked, Cloudflare wall, or network timeout/unreachable)
-      if (apiFailed || !responseData || responseData.statusCode !== "S1000") {
+      // If the API call physically failed (network error, timeout, or non-JSON HTML block)
+      if (apiFailed || !responseData) {
         console.log("⚠️ bdapps API is unreachable, blocked, or returned HTML. Falling back to Sandbox Simulation Mode for testing!");
         
         // Generate simulated reference number
@@ -89,14 +89,31 @@ async function startServer() {
           success: true,
           referenceNo: simulatedRef,
           isSimulated: true,
-          statusDetail: "Running in bdapps Sandbox Simulation Mode (External API unreachable or firewalled)"
+          statusDetail: "Running in bdapps Sandbox Simulation Mode (External API unreachable or firewalled)",
+          debugInfo: {
+            apiFailed,
+            rawResponseLength: responseText ? responseText.length : 0,
+            rawResponseSnippet: responseText ? responseText.substring(0, 200) : "No response content"
+          }
         });
       }
 
-      // Return real response to client
+      // If the API returned a real JSON response but with a non-success status code (e.g. E1313, E1856)
+      if (responseData.statusCode !== "S1000") {
+        return res.json({
+          success: false,
+          error: responseData.statusDetail || `BDApps error: ${responseData.statusCode}`,
+          statusCode: responseData.statusCode,
+          isSimulated: false,
+          referenceNo: responseData.referenceNo
+        });
+      }
+
+      // Return real success response to client
       res.json({
         success: true,
         referenceNo: responseData.referenceNo,
+        isSimulated: false,
         statusDetail: responseData.statusDetail
       });
     } catch (err: any) {
@@ -209,8 +226,8 @@ async function startServer() {
         apiFailed = true;
       }
 
-      if (apiFailed || !responseData || responseData.statusCode !== "S1000") {
-        console.log("Info: bdapps API was unreachable or returned non-success. Activating Failsafe Sandbox Bypass.");
+      if (apiFailed || !responseData) {
+        console.log("Info: bdapps API was unreachable or blocked. Activating Failsafe Sandbox Bypass.");
         
         // Failsafe for sandbox testing: allow success for any input
         if (supabase) {
@@ -258,6 +275,14 @@ async function startServer() {
           subscriberId: subscriberId,
           subscriptionStatus: "REGISTERED",
           statusDetail: "Failsafe subscription activated (External API was unreachable)"
+        });
+      }
+
+      if (responseData.statusCode !== "S1000") {
+        return res.status(400).json({
+          success: false,
+          error: responseData.statusDetail || "Invalid OTP code",
+          statusCode: responseData.statusCode
         });
       }
 

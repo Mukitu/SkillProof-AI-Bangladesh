@@ -30,6 +30,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
   const [mobileNumber, setMobileNumber] = useState('');
   const [otp, setOtp] = useState('');
   const [referenceNo, setReferenceNo] = useState('');
+  const [isSimulated, setIsSimulated] = useState(false);
   
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -86,6 +87,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
 
       if (data.success) {
         setReferenceNo(data.referenceNo);
+        setIsSimulated(!!data.isSimulated);
         setStep('otp');
         setTimer(60);
         setCanResend(false);
@@ -165,6 +167,7 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
 
       if (data.success) {
         setReferenceNo(data.referenceNo);
+        setIsSimulated(!!data.isSimulated);
         setTimer(60);
         setCanResend(false);
         setSuccessMsg(isBn ? 'কোডটি পুনরায় পাঠানো হয়েছে!' : 'OTP code resent successfully!');
@@ -400,6 +403,20 @@ export const SubscriptionPage: React.FC<SubscriptionPageProps> = ({
                           ? `${mobileNumber} নম্বরে পাঠানো ওটিপি কোডটি লিখুন।` 
                           : `Enter the code sent to your mobile number ${mobileNumber}.`}
                       </p>
+
+                      {isSimulated && (
+                        <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs rounded-xl flex items-start gap-2 text-left max-w-xs mx-auto">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold">{isBn ? 'স্যান্ডবক্স সিমুলেশন মোড সক্রিয়' : 'Sandbox Simulation Mode Active'}</p>
+                            <p className="mt-1 text-[11px] text-slate-300 leading-normal">
+                              {isBn 
+                                ? 'বিডিঅ্যাপস এপিআই অফলাইন বা ব্লক রয়েছে। পরীক্ষার জন্য যেকোনো ওটিপি কোড (যেমনঃ ১২৩৪) ব্যবহার করতে পারেন।' 
+                                : 'The bdapps API is unreachable or firewalled. For testing purposes, you can enter any OTP code (e.g., 1234) to continue.'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <form onSubmit={handleVerifyOtp} className="flex flex-col gap-4">
