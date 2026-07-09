@@ -12,6 +12,9 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
+// Dynamic bdapps Base URL (defaults to production API domain)
+const BDAPPS_BASE_URL = process.env.BDAPPS_BASE_URL || "https://api.bdapps.com";
+
 // Clean phone format for Subscriber ID: "tel:8801xxxxxxxxx"
 function formatToSubscriberId(mobile: string): string {
   let cleaned = mobile.replace(/\D/g, "");
@@ -53,7 +56,7 @@ async function startServer() {
       let apiFailed = false;
 
       try {
-        response = await fetch("https://developer.bdapps.com/otp/request", {
+        response = await fetch(`${BDAPPS_BASE_URL}/otp/request`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -200,7 +203,7 @@ async function startServer() {
       let apiFailed = false;
 
       try {
-        response = await fetch("https://developer.bdapps.com/otp/verify", {
+        response = await fetch(`${BDAPPS_BASE_URL}/otp/verify`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -392,7 +395,7 @@ async function startServer() {
           const appId = process.env.BDAPPS_APP_ID || "APP_000375";
           const password = process.env.BDAPPS_PASSWORD || "a07118cda5215fc6d01db5b2ab848edd";
 
-          const response = await fetch("https://developer.bdapps.com/subscription/getStatus", {
+          const response = await fetch(`${BDAPPS_BASE_URL}/subscription/getStatus`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
