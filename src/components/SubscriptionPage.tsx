@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Button, Card } from './UI';
+import { Button, Card, Badge } from './UI';
 import { 
   ShieldCheck, Smartphone, KeyRound, CheckCircle2, 
   Sparkles, Star, Zap, Crown, ArrowRight, ArrowLeft,

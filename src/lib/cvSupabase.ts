@@ -313,9 +313,9 @@ export const cvDb = {
         )) {
           console.warn('⚠️ cv_storage bucket issue, falling back to Base64...');
           
-          const base64 = await new Promise((resolve, reject) => {
+          const base64 = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
+            reader.onloadend = () => resolve(reader.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
