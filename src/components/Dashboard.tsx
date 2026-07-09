@@ -782,6 +782,34 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
           <div className="flex items-center gap-3 sm:gap-4 relative">
             <LanguageSwitch />
             <ThemeSwitch />
+
+            {user?.email === 'nishat.af27@gmail.com' && (
+              <button
+                onClick={() => {
+                  const current = localStorage.getItem("test_unsubscribed_mode");
+                  if (current === "true") {
+                    localStorage.removeItem("test_unsubscribed_mode");
+                    alert(isBn ? "সুপার এডমিন মোড সক্রিয়! আপনি এখন ড্যাশবোর্ড অ্যাক্সেস করতে পারবেন।" : "Super Admin Mode Active! You can now access the full Dashboard.");
+                  } else {
+                    localStorage.setItem("test_unsubscribed_mode", "true");
+                    alert(isBn ? "টেস্টিং মোড সক্রিয়! সাবস্ক্রিপশন পেজটি টেস্ট করার জন্য পেজটি রিফ্রেশ হবে।" : "Testing Mode Active! Refreshing to let you test the subscription page.");
+                  }
+                  window.location.reload();
+                }}
+                className={`text-[10px] font-black px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
+                  localStorage.getItem("test_unsubscribed_mode") === "true"
+                    ? "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20"
+                    : "bg-teal-500/10 text-teal-500 border-teal-500/20 hover:bg-teal-500/20"
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>
+                  {localStorage.getItem("test_unsubscribed_mode") === "true"
+                    ? (isBn ? "সাবস্ক্রিপশন টেস্ট সক্রিয়" : "Sub Test Active")
+                    : (isBn ? "সাবস্ক্রিপশন টেস্ট করুন" : "Test Subscription")}
+                </span>
+              </button>
+            )}
             
             {/* Notification triggers */}
             <div className="relative">

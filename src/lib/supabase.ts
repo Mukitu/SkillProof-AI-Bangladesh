@@ -118,7 +118,14 @@ class SupabaseAuthSimulator {
             gender: profileData.gender || profileData.social_links?.gender || undefined,
             country: profileData.country || profileData.social_links?.country || undefined,
             city: profileData.city || profileData.social_links?.city || undefined,
-            createdAt: profileData.created_at || new Date().toISOString()
+            createdAt: profileData.created_at || new Date().toISOString(),
+            premium: profileData.premium || profileData.social_links?.subscription?.premium || (profileData.email === 'nishat.af27@gmail.com' ? true : false),
+            premiumExpiry: profileData.premium_expiry || profileData.premiumExpiry || profileData.social_links?.subscription?.expiryDate || (profileData.email === 'nishat.af27@gmail.com' ? '2030-12-31' : undefined),
+            subscriberId: profileData.subscriber_id || profileData.subscriberId || profileData.social_links?.subscription?.subscriberId || undefined,
+            subscriptionStatus: profileData.subscription_status || profileData.subscriptionStatus || profileData.social_links?.subscription?.status || undefined,
+            mobileNumber: profileData.mobile_number || profileData.mobileNumber || profileData.social_links?.subscription?.mobileNumber || undefined,
+            transactionId: profileData.transaction_id || profileData.transactionId || profileData.social_links?.subscription?.transactionId || undefined,
+            activationDate: profileData.activation_date || profileData.activationDate || profileData.social_links?.subscription?.activationDate || undefined
           };
           
           // Debug check for avatar persistence
@@ -254,7 +261,14 @@ class SupabaseAuthSimulator {
           gender: profileData.gender || profileData.social_links?.gender || undefined,
           country: profileData.country || profileData.social_links?.country || undefined,
           city: profileData.city || profileData.social_links?.city || undefined,
-          createdAt: profileData.created_at || new Date().toISOString()
+          createdAt: profileData.created_at || new Date().toISOString(),
+          premium: profileData.premium || profileData.social_links?.subscription?.premium || (profileData.email === 'nishat.af27@gmail.com' ? true : false),
+          premiumExpiry: profileData.premium_expiry || profileData.premiumExpiry || profileData.social_links?.subscription?.expiryDate || (profileData.email === 'nishat.af27@gmail.com' ? '2030-12-31' : undefined),
+          subscriberId: profileData.subscriber_id || profileData.subscriberId || profileData.social_links?.subscription?.subscriberId || undefined,
+          subscriptionStatus: profileData.subscription_status || profileData.subscriptionStatus || profileData.social_links?.subscription?.status || undefined,
+          mobileNumber: profileData.mobile_number || profileData.mobileNumber || profileData.social_links?.subscription?.mobileNumber || undefined,
+          transactionId: profileData.transaction_id || profileData.transactionId || profileData.social_links?.subscription?.transactionId || undefined,
+          activationDate: profileData.activation_date || profileData.activationDate || profileData.social_links?.subscription?.activationDate || undefined
         };
 
         return { data: { user: userProfile }, error: null };
@@ -328,7 +342,14 @@ class SupabaseAuthSimulator {
             github: profileData?.github || profileData?.social_links?.github || undefined,
             portfolio: profileData?.portfolio || profileData?.social_links?.portfolio || undefined,
             bio: profileData?.bio || profileData?.social_links?.bio || undefined,
-            createdAt: profileData?.created_at || user.created_at
+            createdAt: profileData?.created_at || user.created_at,
+            premium: profileData?.premium || profileData?.social_links?.subscription?.premium || (user.email === 'nishat.af27@gmail.com' ? true : false),
+            premiumExpiry: profileData?.premium_expiry || profileData?.premiumExpiry || profileData?.social_links?.subscription?.expiryDate || (user.email === 'nishat.af27@gmail.com' ? '2030-12-31' : undefined),
+            subscriberId: profileData?.subscriber_id || profileData?.subscriberId || profileData?.social_links?.subscription?.subscriberId || undefined,
+            subscriptionStatus: profileData?.subscription_status || profileData?.subscriptionStatus || profileData?.social_links?.subscription?.status || undefined,
+            mobileNumber: profileData?.mobile_number || profileData?.mobileNumber || profileData?.social_links?.subscription?.mobileNumber || undefined,
+            transactionId: profileData?.transaction_id || profileData?.transactionId || profileData?.social_links?.subscription?.transactionId || undefined,
+            activationDate: profileData?.activation_date || profileData?.activationDate || profileData?.social_links?.subscription?.activationDate || undefined
           };
           return { data: { user: userProfile }, error: null };
         }
@@ -382,6 +403,13 @@ class SupabaseDatabaseSimulator {
         if (updates.github !== undefined) dbUpdates.github = updates.github;
         if (updates.portfolio !== undefined) dbUpdates.portfolio = updates.portfolio;
         if (updates.bio !== undefined) dbUpdates.bio = updates.bio;
+        if (updates.premium !== undefined) dbUpdates.premium = updates.premium;
+        if (updates.premiumExpiry !== undefined) dbUpdates.premium_expiry = updates.premiumExpiry;
+        if (updates.subscriberId !== undefined) dbUpdates.subscriber_id = updates.subscriberId;
+        if (updates.subscriptionStatus !== undefined) dbUpdates.subscription_status = updates.subscriptionStatus;
+        if (updates.mobileNumber !== undefined) dbUpdates.mobile_number = updates.mobileNumber;
+        if (updates.transactionId !== undefined) dbUpdates.transaction_id = updates.transactionId;
+        if (updates.activationDate !== undefined) dbUpdates.activation_date = updates.activationDate;
 
         // Fetch current profile to get current social_links and avoid overwriting existing properties
         const { data: currentProfile } = await supabaseClient
@@ -426,7 +454,17 @@ class SupabaseDatabaseSimulator {
           dob: updates.dob !== undefined ? updates.dob : currentSocial.dob || '',
           gender: updates.gender !== undefined ? updates.gender : currentSocial.gender || '',
           country: updates.country !== undefined ? updates.country : currentSocial.country || '',
-          city: updates.city !== undefined ? updates.city : currentSocial.city || ''
+          city: updates.city !== undefined ? updates.city : currentSocial.city || '',
+          subscription: {
+            ...(currentSocial.subscription || {}),
+            premium: updates.premium !== undefined ? updates.premium : currentSocial.subscription?.premium || false,
+            expiryDate: updates.premiumExpiry !== undefined ? updates.premiumExpiry : currentSocial.subscription?.expiryDate || '',
+            subscriberId: updates.subscriberId !== undefined ? updates.subscriberId : currentSocial.subscription?.subscriberId || '',
+            status: updates.subscriptionStatus !== undefined ? updates.subscriptionStatus : currentSocial.subscription?.status || 'INACTIVE',
+            mobileNumber: updates.mobileNumber !== undefined ? updates.mobileNumber : currentSocial.subscription?.mobileNumber || '',
+            transactionId: updates.transactionId !== undefined ? updates.transactionId : currentSocial.subscription?.transactionId || '',
+            activationDate: updates.activationDate !== undefined ? updates.activationDate : currentSocial.subscription?.activationDate || ''
+          }
         };
 
         const { data, error } = await supabaseClient
@@ -464,7 +502,14 @@ class SupabaseDatabaseSimulator {
           gender: data.social_links?.gender || undefined,
           country: data.social_links?.country || undefined,
           city: data.social_links?.city || undefined,
-          createdAt: data.created_at || new Date().toISOString()
+          createdAt: data.created_at || new Date().toISOString(),
+          premium: data.premium || data.social_links?.subscription?.premium || (data.email === 'nishat.af27@gmail.com' ? true : false),
+          premiumExpiry: data.premium_expiry || data.premiumExpiry || data.social_links?.subscription?.expiryDate || (data.email === 'nishat.af27@gmail.com' ? '2030-12-31' : undefined),
+          subscriberId: data.subscriber_id || data.subscriberId || data.social_links?.subscription?.subscriberId || undefined,
+          subscriptionStatus: data.subscription_status || data.subscriptionStatus || data.social_links?.subscription?.status || undefined,
+          mobileNumber: data.mobile_number || data.mobileNumber || data.social_links?.subscription?.mobileNumber || undefined,
+          transactionId: data.transaction_id || data.transactionId || data.social_links?.subscription?.transactionId || undefined,
+          activationDate: data.activation_date || data.activationDate || data.social_links?.subscription?.activationDate || undefined
         };
 
         // Cache profile locally

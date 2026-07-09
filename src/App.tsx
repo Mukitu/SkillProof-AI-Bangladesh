@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { LandingPage } from './components/LandingPage';
@@ -13,6 +13,7 @@ import { LoadingSpinner } from './components/UI';
 import { PublicPassportPage } from './components/PublicPassportPage';
 import { VerificationPage } from './components/VerificationPage';
 import { AdminPanel } from './components/AdminPanel';
+import { SubscriptionPage } from './components/SubscriptionPage';
 
 // অভ্যন্তরীণ রাউটিং উইজেট (Inner Routing Widget with access to useAuth)
 function MainRouter() {
@@ -20,6 +21,50 @@ function MainRouter() {
   
   // ট্র্যাকিং স্ক্রিন স্টেট ('home' | 'login' | 'signup' | 'dashboard')
   const [currentScreen, setCurrentScreen] = useState<'home' | 'login' | 'signup'>('home');
+
+  // Subscription checking states
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const [isCheckingSub, setIsCheckingSub] = useState<boolean>(false);
+
+  useEffect(() => {
+    const checkUserSubscription = async () => {
+      if (!user) {
+        setIsSubscribed(null);
+        return;
+      }
+
+      if (user.email === "nishat.af27@gmail.com" && localStorage.getItem("test_unsubscribed_mode") !== "true") {
+        setIsSubscribed(true);
+        return;
+      }
+
+      setIsCheckingSub(true);
+      try {
+        const res = await fetch('/api/subscription/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (user.email === "nishat.af27@gmail.com" && localStorage.getItem("test_unsubscribed_mode") === "true") {
+            setIsSubscribed(false);
+          } else {
+            setIsSubscribed(data.premium);
+          }
+        } else {
+          setIsSubscribed(!!user.premium);
+        }
+      } catch (err) {
+        console.error("Failed to check subscription:", err);
+        setIsSubscribed(!!user.premium);
+      } finally {
+        setIsCheckingSub(false);
+      }
+    };
+
+    checkUserSubscription();
+  }, [user]);
 
   // ইউআরএল পাথ পার্স করা (Parse URL path for public passport and verification routes)
   const path = window.location.pathname;
@@ -59,8 +104,31 @@ function MainRouter() {
     );
   }
 
-  // যদি লগইন করা থাকে, সরাসরি ড্যাশবোর্ডে নিয়ে যাবে (If authenticated, show protected Dashboard)
+  // যদি লগইন করা থাকে, সরাসরি ড্যাশবোর্ডে নিয়ে যাবে (If authenticated, show protected Dashboard or Subscription screen)
   if (user) {
+    if (isCheckingSub && isSubscribed === null) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+          <LoadingSpinner />
+          <span className="text-sm font-semibold text-teal-500 mt-4 font-mono animate-pulse uppercase tracking-wider">
+            Authenticating Premium Profile...
+          </span>
+        </div>
+      );
+    }
+
+    if (isSubscribed === false) {
+      return (
+        <SubscriptionPage 
+          onSubscriptionSuccess={() => setIsSubscribed(true)}
+          onLogout={async () => {
+            await logout();
+            setCurrentScreen('home');
+          }}
+        />
+      );
+    }
+
     return (
       <Dashboard 
         initialTab={initialTab}

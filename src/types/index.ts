@@ -46,6 +46,13 @@ export interface UserProfile {
   country?: string;
   city?: string;
   createdAt: string;
+  premium?: boolean;
+  premiumExpiry?: string;
+  subscriberId?: string;
+  subscriptionStatus?: string;
+  mobileNumber?: string;
+  transactionId?: string;
+  activationDate?: string;
 }
 
 // ইউজার সেটিংস ইন্টারফেস (User Settings Interface)
