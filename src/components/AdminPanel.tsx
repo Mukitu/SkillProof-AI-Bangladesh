@@ -12,15 +12,22 @@ import {
   AdminAssessmentsView 
 } from './admin/AdminAssessmentsView';
 import { 
+  AdminProjectsView 
+} from './admin/AdminProjectsView';
+import {
+  AdminProjectSubmissionsView
+} from './admin/AdminProjectSubmissionsView';
+import { 
   AdminPassportsView 
 } from './admin/AdminPassportsView';
 import { 
   AdminSettingsView, 
   AdminAnnouncementsView, 
   AdminAuditLogsView, 
-  AdminAnalyticsView, 
-  AdminSubscriptionsView 
+  AdminAnalyticsView 
 } from './admin/AdminOtherViews';
+import { AdminReviewsStatsView } from './admin/AdminReviewsStatsView';
+import { AdminJobsView } from './admin/AdminJobsView';
 import { adminDb, AuditLog, Announcement, SystemConfig } from '../lib/adminSupabase';
 import { useAuth } from '../contexts/AuthContext';
 import { LoadingSpinner } from './UI';
@@ -78,7 +85,7 @@ export const AdminPanel: React.FC = () => {
     const path = window.location.pathname;
     if (path.startsWith('/admin/')) {
       const sub = path.substring(7); // characters after '/admin/'
-      if (['dashboard', 'users', 'resumes', 'interviews', 'assessments', 'projects', 'passports', 'reports', 'roadmaps', 'progress', 'verification', 'subscriptions', 'analytics', 'settings', 'logs', 'announcements'].includes(sub)) {
+      if (['dashboard', 'users', 'resumes', 'interviews', 'assessments', 'projects', 'passports', 'reports', 'roadmaps', 'progress', 'verification', 'analytics', 'settings', 'logs', 'announcements', 'reviews_stats', 'jobs'].includes(sub)) {
         setCurrentRoute(sub);
       }
     }
@@ -123,7 +130,7 @@ export const AdminPanel: React.FC = () => {
       const authorizedRoles = ['super_admin', 'admin', 'moderator', 'support', 'viewer'];
       
       let finalRole = 'user';
-      if (user?.email === 'nishat.af27@gmail.com') {
+      if (user?.email === 'mukituislamnishat@gmail.com') {
         finalRole = 'super_admin';
       } else if (activeUserInDb) {
         finalRole = activeUserInDb.role;
@@ -409,6 +416,18 @@ export const AdminPanel: React.FC = () => {
             />
           )}
 
+          {currentRoute === 'projects' && (
+            <AdminProjectsView 
+              assessments={assessments} 
+              onUpdateAssessment={handleUpdateAssessment}
+              onNavigate={handleNavigate}
+            />
+          )}
+
+          {currentRoute === 'project-submissions' && (
+            <AdminProjectSubmissionsView />
+          )}
+
           {currentRoute === 'passports' && (
             <AdminPassportsView 
               passports={passports} 
@@ -437,15 +456,19 @@ export const AdminPanel: React.FC = () => {
           )}
 
           {currentRoute === 'analytics' && (
-            <AdminAnalyticsView totalUsers={users.length} premiumUsers={dashboardStats.premiumUsers} />
+            <AdminAnalyticsView totalUsers={users.length} premiumUsers={0} />
           )}
 
-          {currentRoute === 'subscriptions' && (
-            <AdminSubscriptionsView users={users} onUpdateUser={handleUpdateUser} />
+          {currentRoute === 'reviews_stats' && (
+            <AdminReviewsStatsView />
+          )}
+
+          {currentRoute === 'jobs' && (
+            <AdminJobsView />
           )}
 
           {/* Simple Fallbacks for other list routes to ensure full compliance */}
-          {!['dashboard', 'users', 'assessments', 'passports', 'settings', 'announcements', 'logs', 'analytics', 'subscriptions'].includes(currentRoute) && (
+          {!['dashboard', 'users', 'assessments', 'projects', 'passports', 'settings', 'announcements', 'logs', 'analytics', 'reviews_stats', 'jobs'].includes(currentRoute) && (
             <div className="bg-white p-8 rounded-xl border border-slate-200/80 shadow-sm text-center space-y-4">
               <span className="px-2 py-1 bg-amber-100 text-amber-700 font-bold rounded uppercase tracking-wider text-[10px]">ROUTE FALLBACK ACTIVE</span>
               <h2 className="text-base font-bold text-slate-900 capitalize">/{currentRoute} ভিউ</h2>

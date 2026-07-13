@@ -48,11 +48,7 @@ export interface UserProfile {
   createdAt: string;
   premium?: boolean;
   premiumExpiry?: string;
-  subscriberId?: string;
-  subscriptionStatus?: string;
-  mobileNumber?: string;
-  transactionId?: string;
-  activationDate?: string;
+  customPassword?: string;
 }
 
 // ইউজার সেটিংস ইন্টারফেস (User Settings Interface)

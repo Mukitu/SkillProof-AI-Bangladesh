@@ -84,6 +84,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [displayedQuestion, setDisplayedQuestion] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [interviewLanguage, setInterviewLanguage] = useState<'en' | 'bn'>('bn');
   
   // MediaRecorder API for audio/video recording
   const [isMediaRecording, setIsMediaRecording] = useState(false);
@@ -171,6 +172,12 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
             // ড্রাফট উত্তর রিস্টোর করা
             const draft = localStorage.getItem(`skillproof_answer_draft_${restored.id}`);
             setAnswerText(draft || currentQa.answer || '');
+
+            // ভাষা রিস্টোর করা
+            const savedLang = localStorage.getItem(`skillproof_session_lang_${restored.id}`);
+            if (savedLang === 'en' || savedLang === 'bn') {
+              setInterviewLanguage(savedLang);
+            }
             
             // রানিং এভারেজ ক্যালকুলেশন
             calculateRunningAverage(restored.qa);
@@ -410,19 +417,26 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     setIsSpeechPaused(false);
     
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'en-US';
     utterance.rate = speechRate; // ডাইনামিক স্পিড নির্ধারণ (0.75x, 1x, 1.25x)
     
-    // ক্রোম বা সাফারির জন্য ভালো মানের ভয়েস নির্বাচন
     const voices = window.speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => 
-      v.name.includes('Google US English') || 
-      v.name.includes('Samantha') || 
-      v.name.includes('Zira') ||
-      v.name.includes('Microsoft Zira')
-    );
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
+    if (interviewLanguage === 'bn') {
+      utterance.lang = 'bn-BD';
+      const bnVoice = voices.find(v => v.lang.startsWith('bn'));
+      if (bnVoice) {
+        utterance.voice = bnVoice;
+      }
+    } else {
+      utterance.lang = 'en-US';
+      const femaleVoice = voices.find(v => 
+        v.name.includes('Google US English') || 
+        v.name.includes('Samantha') || 
+        v.name.includes('Zira') ||
+        v.name.includes('Microsoft Zira')
+      );
+      if (femaleVoice) {
+        utterance.voice = femaleVoice;
+      }
     }
 
     utterance.onstart = () => setIsSpeaking(true);
@@ -481,7 +495,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
     const rec = new SpeechRecognition();
     rec.continuous = true;
     rec.interimResults = true;
-    rec.lang = 'en-US';
+    rec.lang = interviewLanguage === 'bn' ? 'bn-BD' : 'en-US';
 
     rec.onstart = () => {
       setIsRecording(true);
@@ -632,7 +646,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
 
     try {
       // ২. গ্রক এপিআই দিয়ে প্রথম স্বাগত ও ওপেনিং প্রশ্ন তৈরি করা (Personalized adaptive start)
-      const firstQ = await interviewGroq.generateFirstQuestion(analysis.careerPath, analysis.skills, adaptiveMemory);
+      const firstQ = await interviewGroq.generateFirstQuestion(analysis.careerPath, analysis.skills, adaptiveMemory, interviewLanguage);
       
       newSession.qa.push({
         id: `qa_1`,
@@ -642,6 +656,7 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
 
       // সেশন রিস্টোর কী এবং ড্রাফট রিমেডি
       localStorage.setItem('skillproof_active_session_id', newSession.id);
+      localStorage.setItem(`skillproof_session_lang_${newSession.id}`, interviewLanguage);
       localStorage.removeItem(`skillproof_answer_draft_${newSession.id}`);
 
       setSession(newSession);
@@ -701,7 +716,8 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
         })),
         trimmedAnswer,
         nextQCount,
-        adaptiveMemory
+        adaptiveMemory,
+        interviewLanguage
       );
 
       // কারেন্ট আইটেমে মূল্যায়ন স্কোর ও ফিডব্যাক যুক্ত করি
@@ -1593,6 +1609,37 @@ export const AiInterview: React.FC<AiInterviewProps> = ({ userId, isBn, onBack }
                           </div>
                         </div>
                       ) : null}
+                      {/* Language Selection */}
+                      <div className="mt-6 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col gap-2">
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          {isBn ? 'ভাইভা প্রদানের ভাষা নির্বাচন করুন' : 'Select Interview Language'}
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setInterviewLanguage('bn')}
+                            className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                              interviewLanguage === 'bn'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500 dark:text-emerald-400 dark:bg-emerald-500/20'
+                                : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                            }`}
+                          >
+                            🇧🇩 {isBn ? 'বাংলা (Bangla)' : 'Bangla'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setInterviewLanguage('en')}
+                            className={`py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all ${
+                              interviewLanguage === 'en'
+                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500 dark:text-emerald-400 dark:bg-emerald-500/20'
+                                : 'bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                            }`}
+                          >
+                            🇬🇧 {isBn ? 'ইংরেজি (English)' : 'English'}
+                          </button>
+                        </div>
+                      </div>
+
                     </div>
 
                     {/* স্টার্ট ইন্টারভিউ অ্যাকশন বোতাম */}

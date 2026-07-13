@@ -273,9 +273,10 @@ Schema:
   const handleDownloadQR = (report: AiReport) => {
     const verifyUrl = `${window.location.origin}/verify/${report.id}`;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(verifyUrl)}`;
+    const proxyUrl = `/api/qr-proxy?url=${encodeURIComponent(qrUrl)}`;
     
     // ডাউনলোড রিকোয়েস্ট চালানো
-    fetch(qrUrl)
+    fetch(proxyUrl)
       .then(response => response.blob())
       .then(blob => {
         const url = window.URL.createObjectURL(blob);

@@ -108,21 +108,19 @@ export const AdminDashboardView: React.FC<DashboardViewProps> = ({ stats, recent
           </div>
         </div>
 
-        {/* Premium Users Card */}
+        {/* Active Users Card */}
         <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-slate-500 text-xs font-semibold">প্রিমিয়াম মেম্বারশিপ</span>
+            <span className="text-slate-500 text-xs font-semibold">সক্রিয় ব্যবহারকারী (আজ)</span>
             <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <CreditCard className="h-5 w-5" />
+              <TrendingUp className="h-5 w-5" />
             </div>
           </div>
           <div className="mt-4">
-            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">{stats.premiumUsers}</span>
+            <span className="text-3xl font-extrabold text-slate-900 tracking-tight">{stats.activeUsersToday}</span>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">
-                {Math.round((stats.premiumUsers / (stats.totalUsers || 1)) * 100)}%
-              </span>
-              <span className="text-[10px] text-slate-400">টোটাল কনভার্সন রেট</span>
+              <span className="text-xs text-blue-600 font-bold bg-blue-50 px-1.5 py-0.5 rounded">লাইভ</span>
+              <span className="text-[10px] text-slate-400">রিয়েল-টাইম এক্টিভিটি</span>
             </div>
           </div>
         </div>
@@ -164,9 +162,9 @@ export const AdminDashboardView: React.FC<DashboardViewProps> = ({ stats, recent
       </div>
 
       {/* Analytics Visualizations Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Signups Growth Line/Area Chart */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm lg:col-span-2">
+        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
           <h2 className="text-sm font-bold text-slate-800 mb-4 font-sans flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-emerald-500" />
             ইউজার গ্রোথ ও সাইন-আপ ট্রেন্ড
@@ -187,45 +185,6 @@ export const AdminDashboardView: React.FC<DashboardViewProps> = ({ stats, recent
                 <Area type="monotone" dataKey="signups" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#colorSignups)" name="সর্বমোট ইউজার" />
               </AreaChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* Subscription Pie Chart */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200/80 shadow-sm">
-          <h2 className="text-sm font-bold text-slate-800 mb-4 font-sans flex items-center gap-2">
-            <Layers className="h-4 w-4 text-blue-500" />
-            ইউজার সাবস্ক্রিপশন বিন্যাস
-          </h2>
-          <div className="h-56 relative flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={subscriptionData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {subscriptionData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          {/* Legend Details */}
-          <div className="flex justify-around text-xs mt-2 border-t border-slate-100 pt-3">
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 block"></span>
-              <span className="text-slate-500">ফ্রি ইউজার: {stats.totalUsers - stats.premiumUsers}</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-500 block"></span>
-              <span className="text-slate-500">প্রিমিয়াম ইউজার: {stats.premiumUsers}</span>
-            </div>
           </div>
         </div>
       </div>

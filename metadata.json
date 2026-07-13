@@ -1,6 +1,6 @@
 {
   "name": "SkillProof AI Bangladesh",
-  "description": "Skills Speak Louder Than Experience. Production-ready platform foundation for verifying skills over credentials.",
-  "requestFramePermissions": [],
+  "description": "Skills Speak Louder Than Experience. Production-ready platform featuring AI-proctored adaptive assessments and real-world skill verification.",
+  "requestFramePermissions": ["camera", "microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

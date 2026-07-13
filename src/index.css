@@ -215,17 +215,18 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
 @media print {
   body, html {
     background: #ffffff !important;
+    color: #000000 !important;
+    height: auto !important;
+    overflow: visible !important;
   }
 
-  body * {
-    visibility: hidden !important;
+  /* Isolate CV print if cv-print-area is present */
+  body:has(#cv-print-area) #root {
+    display: none !important;
   }
   
-  #cv-print-area, #cv-print-area * {
-    visibility: visible !important;
-  }
-  
-  #cv-print-area {
+  body:has(#cv-print-area) #cv-print-area {
+    display: block !important;
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
@@ -241,8 +242,127 @@ input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focu
     print-color-adjust: exact !important;
   }
 
+  /* Enable standard printing for other elements like Career Roadmap */
+  body:not(:has(#cv-print-area)) #root {
+    visibility: visible !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Force light theme elements when printing in dark mode to prevent blank/white PDF text */
+  html.dark body:not(:has(#cv-print-area)) #root,
+  html.dark body:not(:has(#cv-print-area)) #root * {
+    background-color: transparent !important;
+    background-image: none !important;
+    color: #1e293b !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html.dark body:not(:has(#cv-print-area)) h1,
+  html.dark body:not(:has(#cv-print-area)) h2,
+  html.dark body:not(:has(#cv-print-area)) h3,
+  html.dark body:not(:has(#cv-print-area)) h4,
+  html.dark body:not(:has(#cv-print-area)) h5,
+  html.dark body:not(:has(#cv-print-area)) h6 {
+    color: #0f172a !important;
+  }
+
+  html.dark body:not(:has(#cv-print-area)) .text-white,
+  html.dark body:not(:has(#cv-print-area)) .text-slate-100,
+  html.dark body:not(:has(#cv-print-area)) .text-slate-200,
+  html.dark body:not(:has(#cv-print-area)) .text-slate-300,
+  html.dark body:not(:has(#cv-print-area)) .text-slate-400 {
+    color: #334155 !important;
+  }
+
+  html.dark body:not(:has(#cv-print-area)) .bg-slate-900,
+  html.dark body:not(:has(#cv-print-area)) .bg-slate-950,
+  html.dark body:not(:has(#cv-print-area)) .bg-slate-900\/50,
+  html.dark body:not(:has(#cv-print-area)) .bg-slate-900\/60 {
+    background-color: #f8fafc !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 0.75rem !important;
+  }
+
+  html.dark body:not(:has(#cv-print-area)) .border-white\/5 {
+    border-color: #e2e8f0 !important;
+  }
+
+  html.dark body:not(:has(#cv-print-area)) .bg-emerald-500\/10,
+  html.dark body:not(:has(#cv-print-area)) .bg-blue-500\/10,
+  html.dark body:not(:has(#cv-print-area)) .bg-purple-500\/10,
+  html.dark body:not(:has(#cv-print-area)) .bg-amber-500\/10 {
+    background-color: #f1f5f9 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  /* Hide interactive, navigation, and editing controls when printing */
+  button.border-slate-700,
+  .no-print,
+  aside,
+  nav,
+  .flex.gap-2 button:not(.print-btn),
+  select,
+  input {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Dedicated print-specific styles for Career Roadmap to ensure full DOM capture */
+  .career-roadmap-print-container,
+  .career-roadmap-print-container * {
+    color: #0f172a !important;
+    background-color: transparent !important;
+    background-image: none !important;
+    border-color: #cbd5e1 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+
+  .career-roadmap-print-container h1,
+  .career-roadmap-print-container h2,
+  .career-roadmap-print-container h3,
+  .career-roadmap-print-container h4,
+  .career-roadmap-print-container h5,
+  .career-roadmap-print-container h6 {
+    color: #020617 !important;
+    font-weight: 700 !important;
+  }
+
+  .career-roadmap-print-container .bg-slate-900,
+  .career-roadmap-print-container .bg-slate-950,
+  .career-roadmap-print-container .bg-slate-900\/50,
+  .career-roadmap-print-container .bg-slate-900\/60 {
+    background-color: #f8fafc !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-radius: 0.75rem !important;
+  }
+
+  .career-roadmap-print-container .border-white\/5 {
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Make sure icons and tags show up beautifully */
+  .career-roadmap-print-container .text-emerald-400,
+  .career-roadmap-print-container .text-blue-400,
+  .career-roadmap-print-container .text-purple-400,
+  .career-roadmap-print-container .text-amber-400 {
+    color: #1e293b !important;
+    font-weight: 600 !important;
+  }
+
+  /* Retain background colors/gradients during printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   @page {
     size: A4;
-    margin: 0;
+    margin: 10mm !important;
   }
 }

@@ -746,7 +746,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
   };
 
   return (
-    <div className="flex flex-col gap-6 relative min-h-[80vh] pb-16">
+    <div className="flex flex-col gap-6 relative min-h-[80vh] pb-16 overflow-hidden">
+      {/* Red ambient background glows */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-20 -right-40 w-80 h-80 bg-red-900/5 rounded-full blur-3xl pointer-events-none" />
       
       {/* ১. কাস্টম নোটিফিকেশন টোস্ট ডিসপ্লে (Inline Notification Toasts Display) */}
       <div className="fixed top-24 right-6 z-50 flex flex-col gap-3 pointer-events-none max-w-sm w-full">
@@ -759,15 +762,15 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               exit={{ opacity: 0, x: 50 }}
               className={`p-4 rounded-xl border shadow-2xl flex items-start gap-3 pointer-events-auto ${
                 toast.type === 'success' 
-                  ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200' 
+                  ? 'bg-red-950/90 border-red-500/30 text-red-200' 
                   : toast.type === 'error' 
                   ? 'bg-red-950/90 border-red-500/30 text-red-200' 
-                  : 'bg-cyan-950/90 border-cyan-500/30 text-cyan-200'
+                  : 'bg-red-950/90 border-red-500/30 text-red-200'
               }`}
             >
-              {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />}
+              {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />}
               {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />}
-              {toast.type === 'info' && <Loader2 className="w-5 h-5 text-cyan-400 shrink-0 animate-spin mt-0.5" />}
+              {toast.type === 'info' && <Loader2 className="w-5 h-5 text-red-400 shrink-0 animate-spin mt-0.5" />}
               <span className="text-xs font-medium leading-relaxed">{toast.message}</span>
             </motion.div>
           ))}
@@ -785,8 +788,8 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               </h5>
               <p className="text-[11px] text-slate-400 mt-1 max-w-2xl leading-relaxed">
                 {isBn 
-                  ? 'আপনার .env ফাইলের VITE_SUPABASE_URL এবং VITE_GROQ_API_KEY কনফিগার করা নেই। অ্যাপ্লিকেশনটি লোকাল ডাটাবেজে অটো-সেভ এবং সিমুলেটেড হাই-ফিডেলিটি এলএলএম (Llama-3.1) জেনারেটর ব্যবহার করছে।' 
-                  : 'Your VITE_SUPABASE_URL and VITE_GROQ_API_KEY secrets are not configured. The app remains fully functional using local database storage and offline Llama-3.1 evaluation.'}
+                  ? 'আপনার .env ফাইলের VITE_SUPABASE_URL এবং GROQ_API_KEY কনফিগার করা নেই। অ্যাপ্লিকেশনটি লোকাল ডাটাবেজে অটো-সেভ এবং সিমুলেটেড হাই-ফিডেলিটি এলএলএম (Llama-3.1) জেনারেটর ব্যবহার করছে।' 
+                  : 'Your VITE_SUPABASE_URL and GROQ_API_KEY secrets are not configured. The app remains fully functional using local database storage and offline Llama-3.1 evaluation.'}
               </p>
             </div>
           </div>
@@ -811,10 +814,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
             className="flex flex-col gap-8"
           >
             {/* Beautiful Header */}
-            <div className="text-center md:text-left py-4 border-b border-white/5">
+            <div className="bg-gradient-to-r from-red-600/20 via-red-950/15 to-transparent border border-red-500/20 p-6 rounded-3xl text-center md:text-left">
               <h1 className="text-2xl md:text-3xl font-display font-black tracking-tight text-white flex items-center justify-center md:justify-start gap-3">
                 <span>{isBn ? 'এআই স্মার্ট সিভি' : 'AI Smart CV'}</span>
-                <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-mono border border-emerald-500/20">PRO_V1</span>
+                <span className="p-1.5 rounded-lg bg-red-500/10 text-red-400 text-xs font-mono border border-red-500/20">PRO_V1</span>
               </h1>
               <p className="text-sm text-slate-400 mt-1.5 max-w-2xl leading-relaxed">
                 {isBn 
@@ -829,17 +832,17 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               {/* Card 1: Create New CV */}
               <Card 
                 hoverEffect 
-                className="group relative flex flex-col justify-between border border-white/5 bg-[#0a0a0a] hover:border-emerald-500/30 overflow-hidden rounded-3xl p-8 cursor-pointer h-72 transition-all duration-300"
+                className="group relative flex flex-col justify-between border border-white/5 bg-[#0a0a0a] hover:border-red-500/30 overflow-hidden rounded-3xl p-8 cursor-pointer h-72 transition-all duration-300"
                 onClick={startNewCv}
               >
-                <div className="absolute -right-12 -top-12 w-40 h-40 bg-emerald-500/5 blur-3xl rounded-full group-hover:bg-emerald-500/10 transition-colors pointer-events-none" />
+                <div className="absolute -right-12 -top-12 w-40 h-40 bg-red-500/5 blur-3xl rounded-full group-hover:bg-red-500/10 transition-colors pointer-events-none" />
                 
-                <div className="h-14 w-14 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                <div className="h-14 w-14 rounded-2xl bg-red-500/10 text-red-400 border border-red-500/25 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
                   <Plus className="w-8 h-8" />
                 </div>
                 
                 <div className="mt-8">
-                  <h3 className="font-display font-black text-white text-xl group-hover:text-emerald-400 transition-colors">
+                  <h3 className="font-display font-black text-white text-xl group-hover:text-red-400 transition-colors">
                     {isBn ? 'নতুন সিভি তৈরি করুন' : 'Create New CV'}
                   </h3>
                   <p className="text-slate-400 text-xs mt-2 leading-relaxed">
@@ -849,7 +852,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   </p>
                 </div>
 
-                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-widest mt-6">
+                <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-widest mt-6">
                   <span>{isBn ? 'বিল্ডার শুরু করুন' : 'Start Builder'}</span>
                   <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -858,14 +861,14 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               {/* Card 2: Upload Existing CV */}
               <Card 
                 hoverEffect
-                className={`group relative flex flex-col justify-between border ${dragActive ? 'border-cyan-500 bg-cyan-950/10' : 'border-white/5 bg-[#0a0a0a]'} hover:border-cyan-500/30 overflow-hidden rounded-3xl p-8 cursor-pointer h-72 transition-all duration-300`}
+                className={`group relative flex flex-col justify-between border ${dragActive ? 'border-red-500 bg-red-950/10' : 'border-white/5 bg-[#0a0a0a]'} hover:border-red-500/30 overflow-hidden rounded-3xl p-8 cursor-pointer h-72 transition-all duration-300`}
                 onDragEnter={handleDrag}
                 onDragOver={handleDrag}
                 onDragLeave={handleDrag}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className="absolute -right-12 -top-12 w-40 h-40 bg-cyan-500/5 blur-3xl rounded-full group-hover:bg-cyan-500/10 transition-colors pointer-events-none" />
+                <div className="absolute -right-12 -top-12 w-40 h-40 bg-red-500/5 blur-3xl rounded-full group-hover:bg-red-500/10 transition-colors pointer-events-none" />
                 <input 
                   type="file" 
                   ref={fileInputRef}
@@ -874,7 +877,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   className="hidden" 
                 />
 
-                <div className="h-14 w-14 rounded-2xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
+                <div className="h-14 w-14 rounded-2xl bg-red-500/10 text-red-400 border border-red-500/25 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform duration-300">
                   {isUploading ? (
                     <Loader2 className="w-7 h-7 animate-spin" />
                   ) : (
@@ -883,7 +886,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 </div>
 
                 <div className="mt-8">
-                  <h3 className="font-display font-black text-white text-xl group-hover:text-cyan-400 transition-colors">
+                  <h3 className="font-display font-black text-white text-xl group-hover:text-red-400 transition-colors">
                     {isBn ? 'বর্তমান সিভি আপলোড করুন' : 'Upload Existing CV'}
                   </h3>
                   <p className="text-slate-400 text-xs mt-2 leading-relaxed">
@@ -895,10 +898,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
                 {isUploading ? (
                   <div className="w-full bg-white/5 rounded-full h-1.5 mt-6 overflow-hidden">
-                    <div className="bg-cyan-500 h-1.5 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
+                    <div className="bg-red-500 h-1.5 transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-widest mt-6">
+                  <div className="flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-widest mt-6">
                     <span>{isBn ? 'ফাইল সিলেক্ট বা ড্রপ করুন' : 'Select or Drop File'}</span>
                     <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
@@ -912,10 +915,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               <div className="mt-12">
                 <div className="flex justify-between items-center mb-6">
                   <h3 className="font-display font-black text-white text-lg flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-emerald-400" />
+                    <FileText className="w-5 h-5 text-red-400" />
                     <span>{isBn ? 'আমার সংরক্ষিত রেজুমে ড্যাশবোর্ড' : 'Saved Resumes Dashboard'}</span>
                   </h3>
-                  <Badge variant="brand">{cvList.length} Resumes</Badge>
+                  <Badge variant="danger">{cvList.length} Resumes</Badge>
                 </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -923,10 +926,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                     <Card 
                       key={cv.id} 
                       hoverEffect 
-                      className={`relative overflow-hidden border border-white/5 bg-[#0d0d0d] rounded-2xl p-5 hover:border-emerald-500/20 transition-all ${selectedCv?.id === cv.id ? 'ring-2 ring-emerald-500/50' : ''}`}
+                      className={`relative overflow-hidden border border-white/5 bg-[#0d0d0d] rounded-2xl p-5 hover:border-red-500/20 transition-all ${selectedCv?.id === cv.id ? 'ring-2 ring-red-500/50' : ''}`}
                     >
                       <div className="flex justify-between items-start mb-4">
-                        <div className="h-10 w-10 rounded-xl bg-emerald-500/5 text-emerald-400 border border-emerald-500/10 flex items-center justify-center">
+                        <div className="h-10 w-10 rounded-xl bg-red-500/5 text-red-400 border border-red-500/10 flex items-center justify-center">
                           <FileText className="w-5 h-5" />
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -964,11 +967,11 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-white/5">
                         <div>
                           <span className="text-[9px] text-slate-500 block uppercase tracking-wider">ATS MATCH</span>
-                          <span className="text-sm font-bold text-emerald-400 font-mono">{cv.scores?.atsScore || 0}%</span>
+                          <span className="text-sm font-bold text-red-400 font-mono">{cv.scores?.atsScore || 0}%</span>
                         </div>
                         <div>
                           <span className="text-[9px] text-slate-500 block uppercase tracking-wider">SKILLS</span>
-                          <span className="text-sm font-bold text-cyan-400 font-mono">{cv.scores?.skillScore || 0}%</span>
+                          <span className="text-sm font-bold text-red-400 font-mono">{cv.scores?.skillScore || 0}%</span>
                         </div>
                       </div>
 
@@ -1028,7 +1031,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
             className="flex flex-col gap-8 max-w-4xl mx-auto w-full py-8 px-4"
           >
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 text-red-400 border border-red-500/20 mb-4">
                 <Sparkles className="w-8 h-8" />
               </div>
               <h2 className="text-2xl font-black text-white">{isBn ? 'সিভি এনালাইসিস সম্পন্ন!' : 'CV Analysis Completed!'}</h2>
@@ -1037,7 +1040,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
             <div className="grid gap-6">
               <Card className="p-6 border-white/5 bg-[#0a0a0a]">
-                <h3 className="text-emerald-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                <h3 className="text-red-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" /> {isBn ? 'ব্যক্তিগত তথ্য' : 'Personal Info'}
                 </h3>
                 <div className="grid sm:grid-cols-2 gap-4 text-slate-300 text-sm">
@@ -1050,12 +1053,12 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
               <div className="grid md:grid-cols-2 gap-6">
                 <Card className="p-6 border-white/5 bg-[#0a0a0a]">
-                  <h3 className="text-cyan-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
+                  <h3 className="text-red-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
                     <GraduationCap className="w-4 h-4" /> {isBn ? 'শিক্ষা' : 'Education'}
                   </h3>
                   <ul className="space-y-3">
                     {analysisPreview.education.map((edu, i) => (
-                      <li key={i} className="text-sm text-slate-300 border-l-2 border-cyan-500/30 pl-3">
+                      <li key={i} className="text-sm text-slate-300 border-l-2 border-red-500/30 pl-3">
                         <p className="font-bold">{edu.degree}</p>
                         <p className="text-xs text-slate-500">{edu.institution} | {edu.year}</p>
                       </li>
@@ -1132,7 +1135,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               <div className="flex justify-between items-center pb-4 border-b border-white/5">
                 <div>
                   <h2 className="text-xl font-display font-black text-white flex items-center gap-2">
-                    <Sparkles className="w-5 h-5 text-emerald-400" />
+                    <Sparkles className="w-5 h-5 text-red-400" />
                     <span>{isBn ? 'সিভি এডিটর ও এআই বিল্ডার' : 'Resume Editor & AI Builder'}</span>
                   </h2>
                   <p className="text-xs text-slate-400 mt-1">Step {currentStep} of 7 • Add achievements and click AI assist</p>
@@ -1140,13 +1143,13 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 
                 <div className="flex items-center gap-2 shrink-0">
                   {saving ? (
-                    <div className="flex items-center gap-1.5 text-cyan-400">
+                    <div className="flex items-center gap-1.5 text-red-400">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                       <span className="text-[10px] uppercase font-bold tracking-wider font-mono">Auto Saving...</span>
                     </div>
                   ) : (
                     <div className="flex items-center gap-1.5 text-slate-500">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
                       <span className="text-[10px] uppercase font-bold tracking-wider font-mono">Saved to Cloud</span>
                     </div>
                   )}
@@ -1156,7 +1159,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               {/* Step Navigation Progress Bar */}
               <div className="w-full bg-white/5 rounded-full h-1">
                 <div 
-                  className="bg-emerald-500 h-1 rounded-full transition-all duration-300" 
+                  className="bg-red-500 h-1 rounded-full transition-all duration-300" 
                   style={{ width: `${(currentStep / 7) * 100}%` }}
                 />
               </div>
@@ -1169,7 +1172,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                     ------------------------------------- */}
                 {currentStep === 1 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '১. ব্যক্তিগত তথ্য' : '1. Personal Information'}</h3>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '১. ব্যক্তিগত তথ্য' : '1. Personal Information'}</h3>
                     
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1.5">
@@ -1179,7 +1182,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.name || ''} 
                           onChange={(e) => updatePersonalInfo('name', e.target.value)}
                           placeholder="Ariful Islam"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -1189,7 +1192,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.phone || ''} 
                           onChange={(e) => updatePersonalInfo('phone', e.target.value)}
                           placeholder="+8801712-345678"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                     </div>
@@ -1202,7 +1205,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.email || ''} 
                           onChange={(e) => updatePersonalInfo('email', e.target.value)}
                           placeholder="ariful@example.com"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -1212,7 +1215,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.address || ''} 
                           onChange={(e) => updatePersonalInfo('address', e.target.value)}
                           placeholder="Dhaka, Bangladesh"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                     </div>
@@ -1225,7 +1228,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.linkedin || ''} 
                           onChange={(e) => updatePersonalInfo('linkedin', e.target.value)}
                           placeholder="https://linkedin.com/in/username"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -1235,7 +1238,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.github || ''} 
                           onChange={(e) => updatePersonalInfo('github', e.target.value)}
                           placeholder="https://github.com/username"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
@@ -1245,7 +1248,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                           value={wizardCv.personalInfo?.portfolio || ''} 
                           onChange={(e) => updatePersonalInfo('portfolio', e.target.value)}
                           placeholder="https://mywebsite.dev"
-                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                          className="bg-[#121212] border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-red-500/40 text-white"
                         />
                       </div>
                     </div>
@@ -1258,7 +1261,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                         value={wizardCv.personalInfo?.photoUrl || ''} 
                         onChange={(e) => updatePersonalInfo('photoUrl', e.target.value)}
                         placeholder="Paste image URL (e.g. https://images.unsplash.com/...)"
-                        className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                        className="bg-[#121212] border border-white/10 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-red-500/40 text-white"
                       />
                     </div>
                   </motion.div>
@@ -1270,7 +1273,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 {currentStep === 2 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '২. ক্যারিয়ার সামারি' : '2. Career Summary'}</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '২. ক্যারিয়ার সামারি' : '2. Career Summary'}</h3>
                       
                       <Button 
                         variant="primary" 
@@ -1300,7 +1303,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       onChange={(e) => updateCareerSummary(e.target.value)}
                       rows={8}
                       placeholder="e.g. Experienced software professional specialized in..."
-                      className="w-full bg-[#121212] border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-emerald-500/40 text-white leading-relaxed"
+                      className="w-full bg-[#121212] border border-white/10 rounded-xl p-4 text-sm focus:outline-none focus:border-red-500/40 text-white leading-relaxed"
                     />
                   </motion.div>
                 )}
@@ -1311,7 +1314,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 {currentStep === 3 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '৩. শিক্ষাগত যোগ্যতা' : '3. Education'}</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '৩. শিক্ষাগত যোগ্যতা' : '3. Education'}</h3>
                       <Button variant="outline" size="xs" onClick={addEducation} className="gap-1.5 text-xs text-slate-300">
                         <Plus className="w-3.5 h-3.5" />
                         <span>{isBn ? 'নতুন যোগ করুন' : 'Add New'}</span>
@@ -1328,7 +1331,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                             <Trash2 className="w-4 h-4" />
                           </button>
                           
-                          <span className="text-[10px] font-mono text-emerald-500">Degree #{idx + 1}</span>
+                          <span className="text-[10px] font-mono text-red-500">Degree #{idx + 1}</span>
 
                           <div className="grid sm:grid-cols-2 gap-3">
                             <div className="flex flex-col gap-1">
@@ -1338,7 +1341,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 value={edu.degree} 
                                 onChange={(e) => updateEducation(edu.id, 'degree', e.target.value)}
                                 placeholder="B.Sc. in Computer Science"
-                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1348,7 +1351,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 value={edu.institution} 
                                 onChange={(e) => updateEducation(edu.id, 'institution', e.target.value)}
                                 placeholder="University of Dhaka"
-                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                               />
                             </div>
                           </div>
@@ -1361,7 +1364,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 value={edu.year} 
                                 onChange={(e) => updateEducation(edu.id, 'year', e.target.value)}
                                 placeholder="2018 - 2022"
-                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                               />
                             </div>
                             <div className="flex flex-col gap-1">
@@ -1371,7 +1374,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 value={edu.gpa || ''} 
                                 onChange={(e) => updateEducation(edu.id, 'gpa', e.target.value)}
                                 placeholder="3.75 / 4.00"
-                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                               />
                             </div>
                           </div>
@@ -1387,7 +1390,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 {currentStep === 4 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '৪. কর্মসংস্থানের অভিজ্ঞতা' : '4. Work Experience'}</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '৪. কর্মসংস্থানের অভিজ্ঞতা' : '4. Work Experience'}</h3>
                       <Button variant="outline" size="xs" onClick={addExperience} className="gap-1.5 text-xs text-slate-300">
                         <Plus className="w-3.5 h-3.5" />
                         <span>{isBn ? 'নতুন কাজের বিবরণ' : 'Add Experience'}</span>
@@ -1410,12 +1413,12 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                             </button>
 
                             <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-mono text-emerald-500">Company #{idx + 1}</span>
+                              <span className="text-[10px] font-mono text-red-500">Company #{idx + 1}</span>
                               
                               <Button 
                                 variant="glass" 
                                 size="xs" 
-                                className="text-[10px] gap-1 px-2.5 py-1 text-emerald-400 border border-emerald-500/10"
+                                className="text-[10px] gap-1 px-2.5 py-1 text-red-400 border border-red-500/10"
                                 onClick={() => handleAiImproveExperience(exp.id)}
                                 disabled={improvingId === exp.id}
                               >
@@ -1436,7 +1439,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={exp.company} 
                                   onChange={(e) => updateExperience(exp.id, 'company', e.target.value)}
                                   placeholder="Tech Services Ltd"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                               <div className="flex flex-col gap-1">
@@ -1446,7 +1449,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={exp.role} 
                                   onChange={(e) => updateExperience(exp.id, 'role', e.target.value)}
                                   placeholder="React Developer"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                             </div>
@@ -1459,7 +1462,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={exp.duration} 
                                   onChange={(e) => updateExperience(exp.id, 'duration', e.target.value)}
                                   placeholder="Jan 2023 - Present"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                               <div className="flex items-center gap-2 mt-4">
@@ -1468,7 +1471,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   id={`current-${exp.id}`}
                                   checked={exp.isCurrent}
                                   onChange={(e) => updateExperience(exp.id, 'isCurrent', e.target.checked)}
-                                  className="rounded text-emerald-500 focus:ring-emerald-500 h-4 w-4 bg-[#090909] border-white/10"
+                                  className="rounded text-red-500 focus:ring-red-500 h-4 w-4 bg-[#090909] border-white/10"
                                 />
                                 <label htmlFor={`current-${exp.id}`} className="text-xs text-slate-400 cursor-pointer">
                                   {isBn ? 'বর্তমানে এখানে কাজ করছি' : 'Currently work here'}
@@ -1483,7 +1486,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 onChange={(e) => updateExperience(exp.id, 'description', e.target.value)}
                                 placeholder="State accomplishments. E.g. Built high-fidelity dashboards that reduced page latency..."
                                 rows={3}
-                                className="bg-[#090909] border border-white/10 rounded-lg p-3 text-xs focus:outline-none focus:border-emerald-500/40 text-white leading-relaxed"
+                                className="bg-[#090909] border border-white/10 rounded-lg p-3 text-xs focus:outline-none focus:border-red-500/40 text-white leading-relaxed"
                               />
                             </div>
                           </div>
@@ -1499,7 +1502,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 {currentStep === 5 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '৫. প্রজেক্টের বিবরণ (আনলিমিটেড)' : '5. Projects (Unlimited)'}</h3>
+                      <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '৫. প্রজেক্টের বিবরণ (আনলিমিটেড)' : '5. Projects (Unlimited)'}</h3>
                       <Button variant="outline" size="xs" onClick={addProject} className="gap-1.5 text-xs text-slate-300">
                         <Plus className="w-3.5 h-3.5" />
                         <span>{isBn ? 'নতুন প্রজেক্ট' : 'Add Project'}</span>
@@ -1522,11 +1525,11 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                             </button>
 
                             <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-mono text-emerald-500">Project #{idx + 1}</span>
+                              <span className="text-[10px] font-mono text-red-500">Project #{idx + 1}</span>
                               <Button 
                                 variant="glass" 
                                 size="xs" 
-                                className="text-[10px] gap-1 px-2.5 py-1 text-emerald-400 border border-emerald-500/10"
+                                className="text-[10px] gap-1 px-2.5 py-1 text-red-400 border border-red-500/10"
                                 onClick={() => handleAiImproveProject(proj.id)}
                                 disabled={improvingProjId === proj.id}
                               >
@@ -1547,7 +1550,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={proj.title} 
                                   onChange={(e) => updateProject(proj.id, 'title', e.target.value)}
                                   placeholder="E-Commerce Platform"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                               <div className="flex flex-col gap-1">
@@ -1557,7 +1560,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={proj.techStack} 
                                   onChange={(e) => updateProject(proj.id, 'techStack', e.target.value)}
                                   placeholder="React, Redux, Node.js"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                             </div>
@@ -1570,7 +1573,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={proj.github || ''} 
                                   onChange={(e) => updateProject(proj.id, 'github', e.target.value)}
                                   placeholder="https://github.com/..."
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                               <div className="flex flex-col gap-1">
@@ -1580,7 +1583,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                   value={proj.liveLink || ''} 
                                   onChange={(e) => updateProject(proj.id, 'liveLink', e.target.value)}
                                   placeholder="https://website-live.net"
-                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-emerald-500/40 text-white"
+                                  className="bg-[#090909] border border-white/10 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-red-500/40 text-white"
                                 />
                               </div>
                             </div>
@@ -1592,7 +1595,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                                 onChange={(e) => updateProject(proj.id, 'description', e.target.value)}
                                 placeholder="E.g. Built fully responsive client interface. Integrated checkout flow using Stripe API."
                                 rows={2.5}
-                                className="bg-[#090909] border border-white/10 rounded-lg p-3 text-xs focus:outline-none focus:border-emerald-500/40 text-white leading-relaxed"
+                                className="bg-[#090909] border border-white/10 rounded-lg p-3 text-xs focus:outline-none focus:border-red-500/40 text-white leading-relaxed"
                               />
                             </div>
                           </div>
@@ -1607,7 +1610,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                     ------------------------------------- */}
                 {currentStep === 6 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '৬. কারিগরি ও অন্যান্য দক্ষতা' : '6. Skills & Credentials'}</h3>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '৬. কারিগরি ও অন্যান্য দক্ষতা' : '6. Skills & Credentials'}</h3>
 
                     <div className="grid sm:grid-cols-2 gap-6 max-h-[360px] overflow-y-auto pr-2">
                       
@@ -1615,7 +1618,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       <div className="flex flex-col gap-3">
                         <div className="flex justify-between items-center pb-1 border-b border-white/5">
                           <span className="text-[11px] font-bold text-slate-400">TECHNICAL SKILLS</span>
-                          <button onClick={() => addSkillItem('technicalSkills')} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                          <button onClick={() => addSkillItem('technicalSkills')} className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1">
                             <Plus className="w-3.5 h-3.5" /> {isBn ? 'যোগ' : 'Add'}
                           </button>
                         </div>
@@ -1638,7 +1641,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       <div className="flex flex-col gap-3">
                         <div className="flex justify-between items-center pb-1 border-b border-white/5">
                           <span className="text-[11px] font-bold text-slate-400">SOFT SKILLS</span>
-                          <button onClick={() => addSkillItem('softSkills')} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                          <button onClick={() => addSkillItem('softSkills')} className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1">
                             <Plus className="w-3.5 h-3.5" /> {isBn ? 'যোগ' : 'Add'}
                           </button>
                         </div>
@@ -1661,7 +1664,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       <div className="flex flex-col gap-3">
                         <div className="flex justify-between items-center pb-1 border-b border-white/5">
                           <span className="text-[11px] font-bold text-slate-400">LANGUAGES</span>
-                          <button onClick={() => addSkillItem('languages')} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                          <button onClick={() => addSkillItem('languages')} className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1">
                             <Plus className="w-3.5 h-3.5" /> {isBn ? 'যোগ' : 'Add'}
                           </button>
                         </div>
@@ -1684,7 +1687,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       <div className="flex flex-col gap-3">
                         <div className="flex justify-between items-center pb-1 border-b border-white/5">
                           <span className="text-[11px] font-bold text-slate-400">CERTIFICATES & AWARDS</span>
-                          <button onClick={() => addSkillItem('certificates')} className="text-emerald-400 hover:text-emerald-300 text-xs flex items-center gap-1">
+                          <button onClick={() => addSkillItem('certificates')} className="text-red-400 hover:text-red-300 text-xs flex items-center gap-1">
                             <Plus className="w-3.5 h-3.5" /> {isBn ? 'যোগ' : 'Add'}
                           </button>
                         </div>
@@ -1712,7 +1715,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                     ------------------------------------- */}
                 {currentStep === 7 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col gap-5">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-emerald-400">{isBn ? '৭. টেমপ্লেট নির্বাচন করুন' : '7. Choose Resume Template'}</h3>
+                    <h3 className="text-sm font-bold uppercase tracking-wider text-red-400">{isBn ? '৭. টেমপ্লেট নির্বাচন করুন' : '7. Choose Resume Template'}</h3>
 
                     <p className="text-[11px] text-slate-400 leading-relaxed">
                       {isBn 
@@ -1731,9 +1734,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                               return next;
                             });
                           }}
-                          className={`p-3 bg-[#121212] border rounded-xl cursor-pointer text-center hover:border-emerald-500/40 transition-all ${
+                          className={`p-3 bg-[#121212] border rounded-xl cursor-pointer text-center hover:border-red-500/40 transition-all ${
                             wizardCv.templateId === tempId 
-                              ? 'border-emerald-500 text-emerald-400' 
+                              ? 'border-red-500 text-red-400' 
                               : 'border-white/5 text-slate-400'
                           }`}
                         >
@@ -1743,8 +1746,8 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                       ))}
                     </div>
 
-                    <div className="mt-8 p-4 bg-emerald-950/15 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
-                      <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    <div className="mt-8 p-4 bg-red-950/15 border border-red-500/20 rounded-2xl flex items-center gap-3">
+                      <CheckCircle2 className="w-5 h-5 text-red-500 shrink-0" />
                       <div>
                         <h4 className="text-xs font-bold text-white">{isBn ? 'সব তথ্য সেভ করা হয়েছে!' : 'All fields auto-saved!'}</h4>
                         <p className="text-[10px] text-slate-400 mt-0.5">{isBn ? 'নিচের ফিনিশ বাটনে ক্লিক করে ড্যাশবোর্ড এবং প্রিন্ট ভিউ-তে যান।' : 'Proceed to complete wizard build and inspect AI scoring dashboard.'}</p>
@@ -1795,7 +1798,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                     size="sm" 
                     onClick={handleFinishWizard}
                     disabled={saving}
-                    className="gap-1 bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] text-slate-950 font-bold"
+                    className="gap-1 bg-red-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] text-slate-950 font-bold"
                   >
                     <span>{isBn ? 'কমপ্লিট বিল্ড' : 'Finish CV'}</span>
                     <Check className="w-4 h-4" />
@@ -1809,7 +1812,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
             <div className="lg:col-span-5 flex flex-col gap-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-slate-400 tracking-wider uppercase flex items-center gap-1.5">
-                  <Eye className="w-4 h-4 text-emerald-400" />
+                  <Eye className="w-4 h-4 text-red-400" />
                   <span>{isBn ? 'লাইভ টেমপ্লেট প্রিভিউ' : 'Live Template Preview'}</span>
                 </span>
                 
@@ -1868,7 +1871,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   variant="primary" 
                   size="sm" 
                   onClick={triggerDownloadPdf} 
-                  className="gap-1.5 bg-emerald-500 font-bold text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                  className="gap-1.5 bg-red-500 font-bold text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                 >
                   <Download className="w-4 h-4" />
                   <span>{isBn ? 'পিডিএফ ডাউনলোড' : 'Download PDF'}</span>
@@ -1881,17 +1884,17 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               
               <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 text-center">
                 <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">ATS MATCH</span>
-                <span className="text-2xl font-black font-mono text-emerald-400 mt-2 block">{selectedCv.scores?.atsScore || 0}%</span>
+                <span className="text-2xl font-black font-mono text-red-400 mt-2 block">{selectedCv.scores?.atsScore || 0}%</span>
                 <div className="w-full bg-white/5 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-emerald-400 h-1" style={{ width: `${selectedCv.scores?.atsScore || 0}%` }} />
+                  <div className="bg-red-400 h-1" style={{ width: `${selectedCv.scores?.atsScore || 0}%` }} />
                 </div>
               </div>
 
               <div className="bg-[#0b0b0b] border border-white/5 rounded-2xl p-4 text-center">
                 <span className="text-[10px] text-slate-500 block uppercase font-bold tracking-wider">CV QUALITY</span>
-                <span className="text-2xl font-black font-mono text-cyan-400 mt-2 block">{selectedCv.scores?.resumeQualityScore || 0}%</span>
+                <span className="text-2xl font-black font-mono text-red-400 mt-2 block">{selectedCv.scores?.resumeQualityScore || 0}%</span>
                 <div className="w-full bg-white/5 h-1 rounded-full mt-3 overflow-hidden">
-                  <div className="bg-cyan-400 h-1" style={{ width: `${selectedCv.scores?.resumeQualityScore || 0}%` }} />
+                  <div className="bg-red-400 h-1" style={{ width: `${selectedCv.scores?.resumeQualityScore || 0}%` }} />
                 </div>
               </div>
 
@@ -1928,7 +1931,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               <div className="lg:col-span-5 bg-[#090909]/90 border border-white/5 rounded-3xl p-6 flex flex-col justify-between h-[380px]">
                 <div>
                   <h3 className="font-display font-black text-white text-sm flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-emerald-400" />
+                    <Activity className="w-4 h-4 text-red-400" />
                     <span>{isBn ? 'এআই স্কোর গ্রাফিক্যাল এনালাইসিস' : 'AI Intelligence Score Graph'}</span>
                   </h3>
                   <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-mono">Llama-3.1-70B Matrix Output</p>
@@ -1951,14 +1954,14 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                 
                 <div className="flex justify-between items-center border-b border-white/5 pb-3">
                   <h3 className="font-display font-black text-white text-sm flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle className="w-4 h-4 text-red-400" />
                     <span>{isBn ? 'সিভি মূল্যায়ন ও ফিডব্যাক' : 'Resume Evaluations & Suggestions'}</span>
                   </h3>
                   
                   <Button 
                     variant="glass" 
                     size="xs" 
-                    className="text-[10px] gap-1 px-3 py-1 text-emerald-400"
+                    className="text-[10px] gap-1 px-3 py-1 text-red-400"
                     onClick={triggerReanalysis}
                     disabled={reanalyzing}
                   >
@@ -1975,11 +1978,11 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   
                   {/* Strengths */}
                   <div className="flex flex-col gap-3">
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider font-bold">STRENGTHS</span>
+                    <span className="text-[10px] font-mono text-red-400 uppercase tracking-wider font-bold">STRENGTHS</span>
                     <ul className="space-y-2">
                       {Array.isArray(selectedCv.feedback?.strengths) && selectedCv.feedback?.strengths.map((str, i) => (
                         <li key={i} className="text-xs text-slate-300 flex items-start gap-2">
-                          <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <Check className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
                           <span>{str}</span>
                         </li>
                       ))}
@@ -2010,7 +2013,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               
               {/* Missing Skills */}
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
-                <span className="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider">MISSING TECH SKILLS</span>
+                <span className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider">MISSING TECH SKILLS</span>
                 <div className="flex flex-wrap gap-1.5 mt-1">
                   {Array.isArray(selectedCv.feedback?.missingSkills) && selectedCv.feedback?.missingSkills.map((sk, i) => (
                     <Badge key={i} variant="info" className="text-[10px] px-2 py-0.5">{sk}</Badge>
@@ -2046,11 +2049,11 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
               {/* Career Suggestions */}
               <Card className="flex flex-col gap-3 border border-white/5 bg-[#0a0a0a]">
-                <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider">CAREER ROADMAP ADVICE</span>
+                <span className="text-[10px] font-mono text-red-400 font-bold uppercase tracking-wider">CAREER ROADMAP ADVICE</span>
                 <ul className="space-y-1.5 text-xs text-slate-300">
                   {Array.isArray(selectedCv.feedback?.careerSuggestions) && selectedCv.feedback?.careerSuggestions.map((sug, i) => (
                     <li key={i} className="flex gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
                       <span>{sug}</span>
                     </li>
                   ))}
@@ -2063,7 +2066,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
             <div className="bg-[#0b0b0b] border border-white/5 rounded-3xl p-6">
               <div className="flex justify-between items-center mb-6 pb-3 border-b border-white/5">
                 <h3 className="font-display font-black text-white text-sm flex items-center gap-2">
-                  <Layout className="w-5 h-5 text-emerald-400" />
+                  <Layout className="w-5 h-5 text-red-400" />
                   <span>{isBn ? 'সিভি টেমপ্লেট ও প্রিন্ট লেআউট' : 'Active Template & Print Layout'}</span>
                 </h3>
 
@@ -2080,7 +2083,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                         return next;
                       });
                     }}
-                    className="bg-[#121212] border border-white/10 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    className="bg-[#121212] border border-white/10 text-xs rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-red-500"
                   >
                     <option value="modern">Modern</option>
                     <option value="minimal">Minimal</option>
@@ -2121,7 +2124,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
               className="bg-[#0c0c0c] border border-white/10 rounded-3xl p-6 max-w-3xl w-full flex flex-col gap-5 shadow-2xl"
             >
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
-                <div className="flex items-center gap-2 text-emerald-400">
+                <div className="flex items-center gap-2 text-red-400">
                   <Sparkles className="w-5 h-5" />
                   <h3 className="font-display font-black text-white text-base">
                     {isBn ? 'এআই প্রফেশনাল ইম্প্রুভমেন্ট তুলনা' : 'Compare AI Enhancement Suggestions'}
@@ -2144,9 +2147,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
                 {/* After */}
                 <div className="flex flex-col gap-2">
-                  <span className="text-[10px] font-mono text-emerald-400 uppercase font-bold tracking-widest">AI IMPROVED TEXT</span>
-                  <div className="bg-[#121212] border border-emerald-500/20 rounded-2xl p-4 text-xs text-slate-200 min-h-[180px] leading-relaxed whitespace-pre-line relative overflow-hidden">
-                    <div className="absolute top-2 right-2 bg-emerald-500/10 text-emerald-400 text-[8px] font-mono border border-emerald-500/20 px-1.5 py-0.5 rounded uppercase">ATS Optimized</div>
+                  <span className="text-[10px] font-mono text-red-400 uppercase font-bold tracking-widest">AI IMPROVED TEXT</span>
+                  <div className="bg-[#121212] border border-red-500/20 rounded-2xl p-4 text-xs text-slate-200 min-h-[180px] leading-relaxed whitespace-pre-line relative overflow-hidden">
+                    <div className="absolute top-2 right-2 bg-red-500/10 text-red-400 text-[8px] font-mono border border-red-500/20 px-1.5 py-0.5 rounded uppercase">ATS Optimized</div>
                     {comparison.after}
                   </div>
                 </div>
@@ -2158,7 +2161,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   <X className="w-4 h-4 mr-1" />
                   <span>{isBn ? 'প্রত্যাখ্যান করুন' : 'Reject Suggestions'}</span>
                 </Button>
-                <Button variant="primary" size="sm" onClick={handleAcceptComparison} className="bg-emerald-500 text-slate-950 font-bold">
+                <Button variant="primary" size="sm" onClick={handleAcceptComparison} className="bg-red-500 text-slate-950 font-bold">
                   <Check className="w-4 h-4 mr-1" />
                   <span>{isBn ? 'পরামর্শ গ্রহণ করুন' : 'Apply AI Changes'}</span>
                 </Button>
@@ -2204,7 +2207,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
     return (
       <div className="p-4 leading-normal select-text text-[11px] text-slate-800 bg-white">
         {/* Header bar */}
-        <div className="border-b-2 border-emerald-500 pb-4 mb-4 flex justify-between items-start gap-4">
+        <div className="border-b-2 border-red-500 pb-4 mb-4 flex justify-between items-start gap-4">
           <div>
             <h1 className="text-xl font-bold uppercase tracking-tight text-slate-900 leading-none">{cv.personalInfo.name}</h1>
             <p className="text-xs text-slate-500 mt-1.5 tracking-wide">{cv.personalInfo.address}</p>
@@ -2222,7 +2225,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
         {/* Summary */}
         {cv.careerSummary && (
           <div className="mb-4">
-            <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Career Profile</h3>
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Career Profile</h3>
             <p className="text-slate-700 leading-relaxed whitespace-pre-line">{cv.careerSummary}</p>
           </div>
         )}
@@ -2230,7 +2233,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
         {/* Work Experience */}
         {cv.experience?.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1.5">Employment History</h3>
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1.5">Employment History</h3>
             <div className="space-y-3">
               {cv.experience.map((exp) => (
                 <div key={exp.id}>
@@ -2248,13 +2251,13 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
         {/* Projects */}
         {cv.projects?.length > 0 && (
           <div className="mb-4">
-            <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1.5">Key Projects</h3>
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1.5">Key Projects</h3>
             <div className="space-y-3">
               {cv.projects.map((proj) => (
                 <div key={proj.id}>
                   <div className="flex justify-between font-bold text-slate-900">
                     <span>{proj.title} <span className="font-normal text-[10px] text-slate-500">({proj.techStack})</span></span>
-                    {proj.liveLink && <span className="font-normal text-[9px] text-emerald-500">Live</span>}
+                    {proj.liveLink && <span className="font-normal text-[9px] text-red-500">Live</span>}
                   </div>
                   <p className="text-slate-700 mt-0.5 whitespace-pre-line leading-relaxed">{proj.description}</p>
                 </div>
@@ -2266,7 +2269,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
         {/* Grid: Education + Skills */}
         <div className="grid grid-cols-2 gap-4 mt-4 pt-3 border-t border-slate-100">
           <div>
-            <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Education</h3>
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Education</h3>
             {cv.education?.map((edu) => (
               <div key={edu.id} className="mb-2 text-slate-700">
                 <p className="font-bold text-slate-900">{edu.degree}</p>
@@ -2277,7 +2280,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
           </div>
 
           <div>
-            <h3 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-1">Core Competencies</h3>
+            <h3 className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Core Competencies</h3>
             <div className="space-y-1 text-slate-700">
               <p><strong className="text-slate-900">Technical:</strong> {cv.skills.technicalSkills.join(', ')}</p>
               <p><strong className="text-slate-900">Soft Skills:</strong> {cv.skills.softSkills.join(', ')}</p>
@@ -2775,7 +2778,7 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                   </div>
                   <div className="flex justify-between items-baseline mb-1 pl-3">
                     <span className="italic text-slate-700 text-[10px]">Academic Project</span>
-                    <span className="text-emerald-700 font-bold underline cursor-pointer text-[10px]">GitHub</span>
+                    <span className="text-red-700 font-bold underline cursor-pointer text-[10px]">GitHub</span>
                   </div>
                   <ul className="list-inside space-y-1 text-slate-700 pl-3">
                     {proj.description.split('\n').filter(l => l.trim()).map((line, idx) => (
@@ -2810,10 +2813,10 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
            <div className="flex-1">
              <h1 className="text-2xl font-black text-black tracking-tight mb-4">{cv.personalInfo.name}</h1>
              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-slate-600 text-[10px]">
-               <span className="flex items-center gap-2"><Plus className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.email}</span>
-               <span className="flex items-center gap-2"><RefreshCw className="w-3 h-3 text-emerald-500" /> @{cv.personalInfo.name.toLowerCase().replace(' ', '_')}</span>
-               <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.linkedin || 'LinkedIn'}</span>
-               <span className="flex items-center gap-2"><Globe className="w-3 h-3 text-emerald-500" /> {cv.personalInfo.portfolio || 'Website'}</span>
+               <span className="flex items-center gap-2"><Plus className="w-3 h-3 text-red-500" /> {cv.personalInfo.email}</span>
+               <span className="flex items-center gap-2"><RefreshCw className="w-3 h-3 text-red-500" /> @{cv.personalInfo.name.toLowerCase().replace(' ', '_')}</span>
+               <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-red-500" /> {cv.personalInfo.linkedin || 'LinkedIn'}</span>
+               <span className="flex items-center gap-2"><Globe className="w-3 h-3 text-red-500" /> {cv.personalInfo.portfolio || 'Website'}</span>
              </div>
            </div>
            <div className="w-20 h-20 bg-slate-50 border border-slate-200 rounded-2xl overflow-hidden shadow-inner p-2">
@@ -2825,9 +2828,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
         <div className="mb-8">
            <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
-             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="w-full h-0.5 bg-red-500/20" />
              <span className="shrink-0 uppercase tracking-widest text-xs">Employment History</span>
-             <span className="w-12 h-0.5 bg-emerald-500/20" />
+             <span className="w-12 h-0.5 bg-red-500/20" />
            </h2>
            <div className="space-y-6">
              {cv.experience?.map((exp) => (
@@ -2837,8 +2840,8 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                  </div>
                  <div className="flex-1">
                    <div className="flex items-center gap-2 mb-2">
-                     <span className="w-5 h-5 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                       <Plus className="w-3 h-3 text-emerald-500" />
+                     <span className="w-5 h-5 rounded-lg bg-red-500/10 flex items-center justify-center">
+                       <Plus className="w-3 h-3 text-red-500" />
                      </span>
                      <h3 className="font-bold text-black">{exp.company}</h3>
                      <span className="text-slate-400 text-[10px] italic">Village of Frying Pans</span>
@@ -2853,9 +2856,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
         <div className="mb-8">
            <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
-             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="w-full h-0.5 bg-red-500/20" />
              <span className="shrink-0 uppercase tracking-widest text-xs">Education</span>
-             <span className="w-12 h-0.5 bg-emerald-500/20" />
+             <span className="w-12 h-0.5 bg-red-500/20" />
            </h2>
            <div className="space-y-6">
              {cv.education?.map((edu) => (
@@ -2865,8 +2868,8 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
                  </div>
                  <div className="flex-1">
                    <div className="flex items-center gap-2 mb-1">
-                     <span className="w-5 h-5 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                       <Plus className="w-3 h-3 text-emerald-500" />
+                     <span className="w-5 h-5 rounded-lg bg-red-500/10 flex items-center justify-center">
+                       <Plus className="w-3 h-3 text-red-500" />
                      </span>
                      <h3 className="font-bold text-black">{edu.institution}</h3>
                    </div>
@@ -2880,9 +2883,9 @@ export const AiSmartCv: React.FC<AiSmartCvProps> = ({ userId, isBn, onBack, onUp
 
         <div>
            <h2 className="text-lg font-bold text-black mb-4 flex items-center gap-3">
-             <span className="w-full h-0.5 bg-emerald-500/20" />
+             <span className="w-full h-0.5 bg-red-500/20" />
              <span className="shrink-0 uppercase tracking-widest text-xs">Skills</span>
-             <span className="w-12 h-0.5 bg-emerald-500/20" />
+             <span className="w-12 h-0.5 bg-red-500/20" />
            </h2>
            <div className="space-y-3 pl-32">
              <div className="flex gap-4">

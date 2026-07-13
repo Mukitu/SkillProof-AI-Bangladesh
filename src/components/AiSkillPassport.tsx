@@ -296,7 +296,7 @@ export const AiSkillPassport: React.FC<{ onBack: () => void }> = ({ onBack }) =>
 
         <div className="bg-slate-50 p-6 border-t border-slate-100 flex justify-between items-center">
           <div className="flex items-center gap-4 opacity-40 grayscale">
-            <span className="text-[8px] font-bold uppercase tracking-widest">Powered by Gemini 1.5 Pro</span>
+            <span className="text-[8px] font-bold uppercase tracking-widest">Powered by Groq AI</span>
           </div>
           <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
             SkillProof AI Bangladesh © 2026

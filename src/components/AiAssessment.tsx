@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   GraduationCap, Code2, Terminal, ArrowRight, Clock, Sparkles, 
   RefreshCw, X, ChevronRight, ChevronDown, CheckCircle2, AlertTriangle, 
   BookOpen, FileCode, Award, Trash2, Plus, Download, Search, 
   Briefcase, History, BarChart3, Play, Check, CheckSquare, Github, 
-  ExternalLink, FileSpreadsheet, Eye, Info, HelpCircle, ShieldCheck
+  ExternalLink, FileSpreadsheet, Eye, Info, HelpCircle, ShieldCheck, MonitorSmartphone, Maximize, ScreenShare, AlertCircle
 } from 'lucide-react';
 import { 
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -21,6 +21,7 @@ import {
   AssessmentDifficulty, AssessmentFeedback, AssessmentScore 
 } from '../types/assessment';
 import { cvDb } from '../lib/cvSupabase';
+import { useProctoring } from '../hooks/useProctoring';
 
 export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void }> = ({ onBack, onUpdate }) => {
   const { isBn, t } = useLanguage();
@@ -32,6 +33,7 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
   // Selection states
   const [selectedSkill, setSelectedSkill] = useState<string>('');
   const [selectedMode, setSelectedMode] = useState<'practical' | 'project'>('practical');
+
   const [difficulty, setDifficulty] = useState<AssessmentDifficulty>('Beginner');
   const [projectDuration, setProjectDuration] = useState<string>('24 Hours');
 
@@ -69,6 +71,48 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
   // Search/Filter in History
   const [historySearchQuery, setHistorySearchQuery] = useState('');
   const [historyTypeFilter, setHistoryTypeFilter] = useState<string>('all');
+
+  const [showProctoringModal, setShowProctoringModal] = useState(false);
+  const [currentAssessmentId, setCurrentAssessmentId] = useState<string | null>(null);
+
+  const handleProctoringTerminated = useCallback(async () => {
+    if (!activeAssessment || !user) return;
+    
+    const failedFeedback: AssessmentFeedback = {
+      strongPoints: [],
+      weakPoints: ['Academic Integrity'],
+      codeReview: 'Assessment terminated due to repeated proctoring violations.',
+      performanceSuggestions: [],
+      securitySuggestions: [],
+      bestPractices: [],
+      industryStandardTips: [],
+      alternativeSolution: '',
+      learningResources: [],
+      nextRecommendation: 'Please review the exam rules and try again.',
+      improvementPlan: 'Follow academic integrity guidelines.'
+    };
+    
+    const failedScores: AssessmentScore = {
+      overallScore: 0
+    };
+    
+    const updatedRecord: AssessmentRecord = {
+      ...activeAssessment,
+      status: 'failed',
+      completedAt: new Date().toISOString(),
+      trustScore: 0,
+      scores: failedScores,
+      feedback: failedFeedback
+    };
+    
+    await assessmentDb.updateAssessment(activeAssessment.id, updatedRecord);
+    setViewingPastResult(updatedRecord);
+    setIsOngoing(false);
+    setActiveAssessment(null);
+    await loadHistory();
+  }, [activeAssessment, user]);
+
+  const proctoring = useProctoring(currentAssessmentId, user?.id, 3, handleProctoringTerminated);
 
   // Fallback default skills list
   const fallbackSkills = [
@@ -184,16 +228,28 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
   const handleStartAssessment = async () => {
     if (!selectedSkill) return;
     if (!user) return;
+    
+    if (selectedMode === 'practical') {
+      setShowProctoringModal(true);
+      return;
+    }
+    
+    await proceedWithStart();
+  };
 
+  const proceedWithStart = async () => {
+    setShowProctoringModal(false);
     setGeneratingChallenge(true);
     try {
       const newId = `AS-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+      setCurrentAssessmentId(newId);
       
       let questionData: PracticalQuestion | null = null;
       let projectData: ProjectChallenge | null = null;
       let title = '';
 
       if (selectedMode === 'practical') {
+        proctoring.startMonitoring();
         questionData = await assessmentGroq.generatePracticalQuestion(
           selectedSkill,
           userCareerPath,
@@ -202,7 +258,6 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
         );
         title = questionData.question;
         setEditorCode(questionData.initialCode || '');
-        // Set line numbers
         const lines = (questionData.initialCode || '').split('\n').length;
         setLineNumbers(Array.from({ length: Math.max(1, lines) }, (_, i) => i + 1));
       } else {
@@ -213,22 +268,17 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
           cvContextText
         );
         title = projectData.title;
-        // Clean submission states
-        setZipFileName('');
-        setGithubUrl('');
-        setDemoUrl('');
-        setProjectDocs('');
       }
 
       const newRecord: AssessmentRecord = {
         id: newId,
-        userId: user.id,
+        userId: user!.id,
         type: selectedMode,
         skill: selectedSkill,
-        difficulty,
-        title,
+        difficulty: difficulty,
+        title: title,
         status: 'ongoing',
-        duration: selectedMode === 'project' ? projectDuration : 'Ongoing',
+        duration: selectedMode === 'practical' ? '30 Minutes' : projectDuration,
         createdAt: new Date().toISOString(),
         trustScore: 100,
         questionData,
@@ -239,15 +289,24 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
 
       await assessmentDb.saveAssessment(newRecord);
       setActiveAssessment(newRecord);
-      setTimerSeconds(0);
       setIsOngoing(true);
-      setShowHints(false);
+      setTimerSeconds(0);
     } catch (err) {
-      console.error('Error starting assessment:', err);
+      console.error('Failed to generate challenge', err);
     } finally {
       setGeneratingChallenge(false);
     }
   };
+
+  const handleAcceptProctoring = async () => {
+    const granted = await proctoring.requestPermissions();
+    if (granted) {
+      proceedWithStart();
+    } else {
+      alert("Please grant the required permissions to start the exam.");
+    }
+  };
+
 
   // 2. SUBMIT SOLUTION
   const handleSubmitAssessment = async () => {
@@ -340,6 +399,7 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
       // Cleanup active states
       setIsOngoing(false);
       setActiveAssessment(null);
+      proctoring.stopMonitoring();
       await loadHistory();
       if (onUpdate) onUpdate();
     } catch (err) {
@@ -354,6 +414,7 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
     if (confirm(isBn ? 'আপনি কি সত্যিই পরীক্ষাটি বাতিল করতে চান? এতে কোনো রেকর্ড সংরক্ষিত হবে না।' : 'Are you sure you want to discard this assessment? No progress will be saved.')) {
       setIsOngoing(false);
       setActiveAssessment(null);
+      proctoring.stopMonitoring();
     }
   };
 
@@ -450,7 +511,15 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
   };
 
   return (
+
     <div className="flex flex-col gap-6" id="ai-assessment-hub">
+      {/* Proctoring Banner */}
+      {selectedMode === 'practical' && isOngoing && !viewingPastResult && proctoring.isMonitoring && (
+        <div className="bg-red-500/10 border border-red-500/20 text-red-500 p-2 text-center text-xs font-bold sticky top-0 z-50 flex items-center justify-center gap-2 rounded-xl">
+          <AlertCircle className="w-4 h-4" />
+          AI SECURE ASSESSMENT MODE ACTIVE. VIOLATIONS: {proctoring.violations} / {proctoring.maxViolations}
+        </div>
+      )}
       {/* 1. Header Navigation */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between pb-4 border-b border-slate-200 dark:border-white/5 gap-4">
         <div>
@@ -922,6 +991,7 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
                   // Human Readable keys
                   const label = key.replace('Score', '').replace(/^[a-z]/, c => c.toUpperCase());
                   return (
+
                     <div key={key} className="flex flex-col gap-1">
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-slate-500 font-medium">{label}</span>
@@ -1423,6 +1493,52 @@ export const AiAssessment: React.FC<{ onBack: () => void; onUpdate?: () => void 
           </div>
         </div>
       )}
+
+      {/* Proctoring Setup Modal */}
+      {showProctoringModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-[#090909] border border-white/10 rounded-2xl w-full max-w-md p-6 relative overflow-hidden">
+             <div className="mb-6 flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mb-4">
+                  <MonitorSmartphone className="w-8 h-8" />
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">AI Secure Assessment Mode</h2>
+                <p className="text-sm text-slate-400">
+                  This is a proctored exam. To ensure academic integrity, we require the following permissions.
+                </p>
+             </div>
+             
+             <div className="space-y-3 mb-8">
+               <div className="flex items-center gap-3 text-sm text-slate-300 bg-white/5 p-3 rounded-xl border border-white/5">
+                 <Maximize className="w-5 h-5 text-emerald-400" />
+                 <span>Fullscreen Mode Required</span>
+               </div>
+               <div className="flex items-center gap-3 text-sm text-slate-300 bg-white/5 p-3 rounded-xl border border-white/5">
+                 <ScreenShare className="w-5 h-5 text-emerald-400" />
+                 <span>Screen Sharing Required</span>
+               </div>
+               <div className="flex items-center gap-3 text-sm text-slate-300 bg-white/5 p-3 rounded-xl border border-white/5">
+                 <Eye className="w-5 h-5 text-emerald-400" />
+                 <span>Browser Focus Monitoring</span>
+               </div>
+             </div>
+
+             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 mb-6">
+                <p className="text-xs text-red-400 leading-relaxed text-center">
+                  <strong>Warning:</strong> Switching tabs, exiting fullscreen, or stopping screen share will count as a violation. {proctoring.maxViolations} violations will result in automatic termination.
+                </p>
+             </div>
+
+             <div className="flex gap-3">
+               <Button onClick={() => setShowProctoringModal(false)} variant="outline" className="flex-1 border-white/10 text-white">Cancel</Button>
+               <Button onClick={handleAcceptProctoring} className="flex-1 bg-red-500 hover:bg-red-600 text-white border-0">
+                 Agree & Start
+               </Button>
+             </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -3,30 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import Groq from 'groq-sdk';
 import { CvData, AiScores, AiFeedback, PersonalInfo, EducationItem, ExperienceItem, ProjectItem, CvSkills } from '../types';
 
 // গ্রক এপিআই কী রিড করা (Retrieve Groq API key)
-const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
-
-let groqClient: Groq | null = null;
-let isRealGroq = false;
-
-if (groqApiKey && groqApiKey !== 'YOUR_GROQ_API_KEY') {
-  try {
-    // ব্রাউজারে ব্যবহারের জন্য dangerouslyAllowBrowser সচল করা হয়েছে
-    groqClient = new Groq({
-      apiKey: groqApiKey,
-      dangerouslyAllowBrowser: true
-    });
-    isRealGroq = true;
-    console.log('✅ Groq AI Service Initialized Successfully.');
-  } catch (err) {
-    console.error('❌ Groq initialization failed:', err);
-  }
-} else {
-  console.warn('⚠️ Groq API Key is missing. Running in simulated offline AI mode.');
-}
+// Backend proxy is used for AI.
+const isRealGroq = true;
 
 // গ্রক মডেল নির্ধারণ (Groq Llama-3.1 model)
 const MODEL_NAME = 'llama-3.3-70b-versatile';
@@ -181,20 +162,22 @@ RESPONSE FORMAT (Strict JSON):
 Respond ONLY with the raw JSON object.`;
 
     try {
-      const response = await fetch('/api/ai/groq', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt,
-          model: MODEL_NAME,
-          temperature: 0.3,
-          max_tokens: 1800
-        })
-      });
       
-      if (!response.ok) throw new Error('AI Proxy request failed');
-      const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+        const groqResponse = await fetch('/api/ai/groq', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt,
+            model: MODEL_NAME,
+            temperature: 0.0,
+            max_tokens: 1800,
+            seed: 42,
+            response_format: { type: "json_object" }
+          })
+        });
+        if (!groqResponse.ok) throw new Error('Groq request failed');
+        const data = await groqResponse.json();
+        content = data.choices[0]?.message?.content || '';
       
       if (content) {
         // র অবজেক্ট ক্লিন করা (Clean markdown wrappers if present)
@@ -209,7 +192,7 @@ Respond ONLY with the raw JSON object.`;
       }
       throw new Error('Invalid JSON format from AI');
     } catch (err: any) {
-      console.error('Groq CV Analysis failed:', err);
+      console.error('CV Analysis failed:', err);
       throw new Error('Failed to analyze CV using AI: ' + err.message);
     }
   }

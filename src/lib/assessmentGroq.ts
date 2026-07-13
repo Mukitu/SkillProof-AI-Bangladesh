@@ -165,12 +165,12 @@ You MUST return ONLY a raw JSON object with the following schema (no markdown wr
     }
   },
 
-  // ৩. কোডিং সলিউশন মূল্যায়ন (Evaluate Practical Coding Solution)
+  // ৩. কোডিং সリューション মূল্যায়ন (Evaluate Practical Coding Solution)
   evaluatePracticalSubmission: async (
     question: PracticalQuestion,
     userCode: string
   ): Promise<{ scores: AssessmentScore; feedback: AssessmentFeedback; trustScore: number }> => {
-    const prompt = `You are an elite Senior Engineer conducting a technical code review.
+    const prompt = `You are an elite Senior Engineer conducting a technical code review and plagiarism audit.
 Evaluate the candidate's submitted solution code against the following Question & requirements.
 
 Question:
@@ -191,7 +191,15 @@ ${userCode}
 
 Analyze the code structure, syntax correctness, algorithmic logic, edge-case handling, performance, security, and cleanliness.
 Return a very strict evaluation. Give a realistic score (0-100) based on code quality.
-Also estimate a "trustScore" (0-100) which represents how closely they adhered to requirements and constraints, and did not copy boilerplate solutions.
+
+**CRITICAL PLAGIARISM & AI-GENERATION CHECK**:
+- Carefully audit the submitted code to detect if it was generated/copied from an AI assistant (such as ChatGPT, Claude, Gemini).
+- Common AI indicators: Sterile/perfect boilerplate comments, overly-verbose '// explanation comments' on almost every trivial line of code, standard ChatGPT-style function designs, too-sterile error handling that isn't typically typed by a candidate under time constraints.
+- If you suspect the code is AI-generated:
+  1. The "trustScore" MUST be set very low (below 50, e.g., 20-35).
+  2. In the "feedback.weakPoints" list, add a clear warning: "⚠️ AI-Generated Code Footprint Detected" or "⚠️ AI Plagiarism Suspected".
+  3. In the "feedback.codeReview", write a strict feedback warning that AI-assisted solutions are strictly prohibited, explaining exactly what AI footprints were detected in their code (e.g. sterile ChatGPT template comments, unnecessary verbose step-by-step comments, etc.).
+  4. Lower the overallScore and codeQualityScore to reflect the integrity violation.
 
 You MUST return ONLY a raw JSON object with the following schema (no markdown wrappers like \`\`\`json, no other text):
 {
@@ -202,11 +210,11 @@ You MUST return ONLY a raw JSON object with the following schema (no markdown wr
     "performanceScore": number (0-100),
     "securityScore": number (0-100)
   },
-  "trustScore": number (0-100),
+  "trustScore": number (0-100, set below 50 if suspected of being AI-generated),
   "feedback": {
     "strongPoints": ["List of 2-3 specific parts of their code that are strong/correct"],
-    "weakPoints": ["List of 2-3 specific limitations, errors, or bugs in their code"],
-    "codeReview": "A continuous markdown-formatted paragraph giving a detailed, helpful line-by-line review comments",
+    "weakPoints": ["List of 2-3 specific limitations, errors, or bugs, including AI code detection warnings if applicable"],
+    "codeReview": "A continuous markdown-formatted paragraph giving a detailed, helpful line-by-line review comments and strict AI-use warnings if applicable",
     "performanceSuggestions": ["1-2 suggestions to optimize performance, complexity, or memory"],
     "securitySuggestions": ["1-2 suggestions regarding security, inputs validation, or safety safeguards"],
     "bestPractices": ["1-2 general guidelines for best practices"],

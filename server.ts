@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import Groq from 'groq-sdk';
+import { GoogleGenAI } from "@google/genai";
 import dotenv from 'dotenv';
 import { createClient } from "@supabase/supabase-js";
 
@@ -12,542 +13,18 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "";
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Dynamic bdapps Base URL (defaults to production API domain)
-const BDAPPS_BASE_URL = process.env.BDAPPS_BASE_URL || "https://api.bdapps.com";
-
-// Clean phone format for Subscriber ID: "tel:8801xxxxxxxxx"
-function formatToSubscriberId(mobile: string): string {
-  let cleaned = mobile.replace(/\D/g, "");
-  if (cleaned.startsWith("880")) {
-    // Already has country code
-  } else if (cleaned.startsWith("0")) {
-    cleaned = "88" + cleaned;
-  } else {
-    cleaned = "880" + cleaned;
-  }
-  return "tel:" + cleaned;
-}
-
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json());
-
-  // --- bdapps Subscription API Routes ---
-
-  // OTP Request Route
-  app.post("/api/subscription/otp-request", async (req, res) => {
-    try {
-      const { mobileNumber } = req.body;
-      if (!mobileNumber) {
-        return res.status(400).json({ error: "Mobile number is required" });
-      }
-
-      const subscriberId = formatToSubscriberId(mobileNumber);
-      const appId = process.env.BDAPPS_APP_ID || "APP_000375";
-      const password = process.env.BDAPPS_PASSWORD || "a07118cda5215fc6d01db5b2ab848edd";
-
-      console.log(`Sending bdapps OTP request for ${subscriberId} with App ID ${appId}`);
-
-      let response;
-      let responseText = "";
-      let responseData: any = null;
-      let apiFailed = false;
-
-      try {
-        response = await fetch(`${BDAPPS_BASE_URL}/otp/request`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            applicationId: appId,
-            password: password,
-            subscriberId: subscriberId
-          }),
-          signal: AbortSignal.timeout(6000)
-        });
-
-        responseText = await response.text();
-        console.log(`bdapps Raw OTP Response Code: ${response.status}`);
-        
-        try {
-          responseData = JSON.parse(responseText);
-        } catch (parseErr) {
-          console.log("Info: Could not parse bdapps response as JSON (may be blocked or down). Raw response length:", responseText.length);
-          apiFailed = true;
-        }
-      } catch (fetchErr: any) {
-        console.error("Failed to connect to bdapps API:", fetchErr.message);
-        apiFailed = true;
-      }
-
-      // If the API call physically failed (network error, timeout, or non-JSON HTML block)
-      if (apiFailed || !responseData) {
-        console.log("⚠️ bdapps API is unreachable, blocked, or returned HTML. Falling back to Sandbox Simulation Mode for testing!");
-        
-        // Generate simulated reference number
-        const simulatedRef = `simulated-ref-${Math.random().toString(36).substring(2, 15)}`;
-        
-        return res.json({
-          success: true,
-          referenceNo: simulatedRef,
-          isSimulated: true,
-          statusDetail: "Running in bdapps Sandbox Simulation Mode (External API unreachable or firewalled)",
-          debugInfo: {
-            apiFailed,
-            rawResponseLength: responseText ? responseText.length : 0,
-            rawResponseSnippet: responseText ? responseText.substring(0, 200) : "No response content"
-          }
-        });
-      }
-
-      // If the API returned a real JSON response but with a non-success status code (e.g. E1313, E1856)
-      if (responseData.statusCode !== "S1000") {
-        return res.json({
-          success: false,
-          error: responseData.statusDetail || `BDApps error: ${responseData.statusCode}`,
-          statusCode: responseData.statusCode,
-          isSimulated: false,
-          referenceNo: responseData.referenceNo
-        });
-      }
-
-      // Return real success response to client
-      res.json({
-        success: true,
-        referenceNo: responseData.referenceNo,
-        isSimulated: false,
-        statusDetail: responseData.statusDetail
-      });
-    } catch (err: any) {
-      console.error("OTP Request Route Error:", err);
-      res.status(500).json({ error: "Internal server error during OTP request", details: err.message });
-    }
-  });
-
-  // OTP Verify Route
-  app.post("/api/subscription/otp-verify", async (req, res) => {
-    try {
-      const { otp, referenceNo, mobileNumber, userId } = req.body;
-      if (!otp || !referenceNo || !mobileNumber || !userId) {
-        return res.status(400).json({ error: "otp, referenceNo, mobileNumber, and userId are required" });
-      }
-
-      const subscriberId = formatToSubscriberId(mobileNumber);
-      const expiryDateStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(); // 1 year sliding window
-
-      // 1. Simulation Check: If reference number is simulated, automatically succeed
-      if (referenceNo.startsWith("simulated-ref-")) {
-        console.log(`[Simulation] Verifying OTP ${otp} for simulated session ${referenceNo}`);
-        
-        // Sync to Supabase
-        if (supabase) {
-          try {
-            const { data: currentProfile } = await supabase
-              .from('profiles')
-              .select('social_links')
-              .eq('id', userId)
-              .maybeSingle();
-
-            const currentSocial = currentProfile?.social_links || {};
-            const socialLinks = {
-              ...currentSocial,
-              subscription: {
-                premium: true,
-                expiryDate: expiryDateStr,
-                subscriberId: subscriberId,
-                status: "REGISTERED",
-                mobileNumber: mobileNumber,
-                transactionId: referenceNo,
-                activationDate: new Date().toISOString()
-              }
-            };
-
-            await supabase
-              .from('profiles')
-              .update({
-                premium: true,
-                premium_expiry: expiryDateStr,
-                subscriber_id: subscriberId,
-                mobile_number: mobileNumber,
-                subscription_status: "REGISTERED",
-                transaction_id: referenceNo,
-                activation_date: new Date().toISOString(),
-                social_links: socialLinks
-              })
-              .eq('id', userId);
-
-            console.log("Supabase Profile subscription updated successfully via simulation!");
-          } catch (dbErr) {
-            console.error("Exception during Supabase subscription sync (Simulation):", dbErr);
-          }
-        }
-
-        return res.json({
-          success: true,
-          subscriberId: subscriberId,
-          subscriptionStatus: "REGISTERED",
-          statusDetail: "Simulated Subscription successful (Verification bypassed)"
-        });
-      }
-
-      // 2. Real API Verify
-      const appId = process.env.BDAPPS_APP_ID || "APP_000375";
-      const password = process.env.BDAPPS_PASSWORD || "a07118cda5215fc6d01db5b2ab848edd";
-
-      console.log(`Verifying bdapps OTP code ${otp} for Ref ${referenceNo}`);
-
-      let response;
-      let responseText = "";
-      let responseData: any = null;
-      let apiFailed = false;
-
-      try {
-        response = await fetch(`${BDAPPS_BASE_URL}/otp/verify`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            applicationId: appId,
-            password: password,
-            referenceNo: referenceNo,
-            otp: otp
-          }),
-          signal: AbortSignal.timeout(6000)
-        });
-
-        responseText = await response.text();
-        console.log(`bdapps Raw Verify Response Code: ${response.status}`);
-
-        try {
-          responseData = JSON.parse(responseText);
-        } catch (parseErr) {
-          console.log("Info: Could not parse bdapps verify response as JSON. Raw length:", responseText.length);
-          apiFailed = true;
-        }
-      } catch (fetchErr: any) {
-        console.error("Failed to connect to bdapps API during verify:", fetchErr.message);
-        apiFailed = true;
-      }
-
-      if (apiFailed || !responseData) {
-        console.log("Info: bdapps API was unreachable or blocked. Activating Failsafe Sandbox Bypass.");
-        
-        // Failsafe for sandbox testing: allow success for any input
-        if (supabase) {
-          try {
-            const { data: currentProfile } = await supabase
-              .from('profiles')
-              .select('social_links')
-              .eq('id', userId)
-              .maybeSingle();
-
-            const currentSocial = currentProfile?.social_links || {};
-            const socialLinks = {
-              ...currentSocial,
-              subscription: {
-                premium: true,
-                expiryDate: expiryDateStr,
-                subscriberId: subscriberId,
-                status: "REGISTERED",
-                mobileNumber: mobileNumber,
-                transactionId: referenceNo,
-                activationDate: new Date().toISOString()
-              }
-            };
-
-            await supabase
-              .from('profiles')
-              .update({
-                premium: true,
-                premium_expiry: expiryDateStr,
-                subscriber_id: subscriberId,
-                mobile_number: mobileNumber,
-                subscription_status: "REGISTERED",
-                transaction_id: referenceNo,
-                activation_date: new Date().toISOString(),
-                social_links: socialLinks
-              })
-              .eq('id', userId);
-          } catch (dbErr) {
-            console.error("Exception during failsafe Supabase sync:", dbErr);
-          }
-        }
-
-        return res.json({
-          success: true,
-          subscriberId: subscriberId,
-          subscriptionStatus: "REGISTERED",
-          statusDetail: "Failsafe subscription activated (External API was unreachable)"
-        });
-      }
-
-      if (responseData.statusCode !== "S1000") {
-        return res.status(400).json({
-          success: false,
-          error: responseData.statusDetail || "Invalid OTP code",
-          statusCode: responseData.statusCode
-        });
-      }
-
-      if (responseData.statusCode === "S1000") {
-        const verifiedSubscriberId = responseData.subscriberId || subscriberId;
-
-        // Sync to Supabase
-        if (supabase) {
-          try {
-            const { data: currentProfile } = await supabase
-              .from('profiles')
-              .select('social_links')
-              .eq('id', userId)
-              .maybeSingle();
-
-            const currentSocial = currentProfile?.social_links || {};
-            const socialLinks = {
-              ...currentSocial,
-              subscription: {
-                premium: true,
-                expiryDate: expiryDateStr,
-                subscriberId: verifiedSubscriberId,
-                status: "REGISTERED",
-                mobileNumber: mobileNumber,
-                transactionId: referenceNo,
-                activationDate: new Date().toISOString()
-              }
-            };
-
-            await supabase
-              .from('profiles')
-              .update({
-                premium: true,
-                premium_expiry: expiryDateStr,
-                subscriber_id: verifiedSubscriberId,
-                mobile_number: mobileNumber,
-                subscription_status: "REGISTERED",
-                transaction_id: referenceNo,
-                activation_date: new Date().toISOString(),
-                social_links: socialLinks
-              })
-              .eq('id', userId);
-          } catch (dbErr) {
-            console.error("Exception during Supabase sync:", dbErr);
-          }
-        }
-
-        res.json({
-          success: true,
-          subscriberId: verifiedSubscriberId,
-          subscriptionStatus: responseData.subscriptionStatus || "REGISTERED",
-          statusDetail: responseData.statusDetail
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          error: responseData.statusDetail || "Invalid OTP code",
-          statusCode: responseData.statusCode
-        });
-      }
-    } catch (err: any) {
-      console.error("OTP Verify Route Error:", err);
-      res.status(500).json({ error: "Internal server error during OTP verification", details: err.message });
-    }
-  });
-
-  // Check Subscription Status Route
-  app.post("/api/subscription/check", async (req, res) => {
-    try {
-      const { userId } = req.body;
-      if (!userId) {
-        return res.status(400).json({ error: "userId is required" });
-      }
-
-      if (!supabase) {
-        return res.json({ success: true, premium: false, message: "Supabase not connected" });
-      }
-
-      // 1. Fetch user's cached profile from Supabase
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
-      if (error || !profile) {
-        return res.status(404).json({ error: "User profile not found in Supabase" });
-      }
-
-      // Check nishat.af27@gmail.com
-      if (profile.email === "nishat.af27@gmail.com" && localStorage.getItem("test_unsubscribed_mode") !== "true") {
-        return res.json({
-          success: true,
-          premium: true,
-          subscriptionStatus: "REGISTERED",
-          mobileNumber: profile.mobile_number || "Super Admin",
-          expiryDate: "2030-12-31"
-        });
-      }
-
-      const subscriberId = profile.subscriber_id || profile.social_links?.subscription?.subscriberId;
-      const cachedPremium = profile.premium || profile.social_links?.subscription?.premium || false;
-
-      // 2. If subscriber ID exists, double-check real-time state with bdapps
-      if (subscriberId && !subscriberId.startsWith("tel:simulated")) {
-        try {
-          const appId = process.env.BDAPPS_APP_ID || "APP_000375";
-          const password = process.env.BDAPPS_PASSWORD || "a07118cda5215fc6d01db5b2ab848edd";
-
-          const response = await fetch(`${BDAPPS_BASE_URL}/subscription/getStatus`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              applicationId: appId,
-              password: password,
-              subscriberId: subscriberId
-            }),
-            signal: AbortSignal.timeout(4000)
-          });
-
-          const responseText = await response.text();
-          let responseData: any = null;
-          try {
-            responseData = JSON.parse(responseText);
-          } catch (parseErr) {
-            console.warn("Failed to parse bdapps status check response as JSON. Raw length:", responseText.length);
-          }
-          console.log(`bdapps status check for ${subscriberId}:`, responseData);
-
-          if (responseData && responseData.statusCode === "S1000") {
-            const isRegistered = responseData.subscriptionStatus === "REGISTERED";
-
-            // If local state doesn't match bdapps real-time state, update local state
-            if (isRegistered !== cachedPremium) {
-              const currentSocial = profile.social_links || {};
-              const updatedSocial = {
-                ...currentSocial,
-                subscription: {
-                  ...(currentSocial.subscription || {}),
-                  premium: isRegistered,
-                  status: responseData.subscriptionStatus
-                }
-              };
-
-              await supabase
-                .from('profiles')
-                .update({
-                  premium: isRegistered,
-                  premium_expiry: isRegistered ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() : null,
-                  subscription_status: responseData.subscriptionStatus,
-                  social_links: updatedSocial
-                })
-                .eq('id', userId);
-            }
-
-            return res.json({
-              success: true,
-              premium: isRegistered,
-              subscriptionStatus: responseData.subscriptionStatus,
-              mobileNumber: profile.mobile_number,
-              expiryDate: profile.premium_expiry
-            });
-          }
-        } catch (apiErr: any) {
-          console.error("Error querying real-time status from bdapps:", apiErr.message);
-          // Graceful fallback to cached state if bdapps is down, rate-limited, or returns HTML
-        }
-      }
-
-      // Return cached state
-      return res.json({
-        success: true,
-        premium: cachedPremium,
-        subscriptionStatus: profile.subscription_status || profile.social_links?.subscription?.status || "INACTIVE",
-        mobileNumber: profile.mobile_number || profile.social_links?.subscription?.mobileNumber,
-        expiryDate: profile.premium_expiry || profile.social_links?.subscription?.expiryDate
-      });
-    } catch (err: any) {
-      console.error("Subscription Status Check Error:", err);
-      res.status(500).json({ error: "Internal server error during status check", details: err.message });
-    }
-  });
-
-  // Webhook / Notification Endpoint
-  app.post("/api/subscription/notify", async (req, res) => {
-    try {
-      console.log("📥 Received bdapps subscription webhook event:", req.body);
-      const { subscriberId, status, frequency, timeStamp } = req.body;
-
-      if (!subscriberId || !status) {
-        return res.status(400).json({ error: "subscriberId and status are required" });
-      }
-
-      if (supabase) {
-        // Query profiles containing this subscriber ID (direct column OR matching JSONB string)
-        const { data: profiles, error: findError } = await supabase
-          .from('profiles')
-          .select('id, social_links, email')
-          .or(`subscriber_id.eq.${subscriberId}`);
-
-        if (findError) {
-          console.error("Error finding profile with subscriber ID:", findError);
-        }
-
-        const isRegistered = status === "REGISTERED" || status === "REGISTERED.";
-        const statusClean = isRegistered ? "REGISTERED" : "UNREGISTERED";
-        const expiryDateStr = isRegistered ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() : null;
-
-        if (profiles && profiles.length > 0) {
-          for (const p of profiles) {
-            // Bypass Super Admin
-            if (p.email === "nishat.af27@gmail.com") continue;
-
-            const currentSocial = p.social_links || {};
-            const socialLinks = {
-              ...currentSocial,
-              subscription: {
-                ...(currentSocial.subscription || {}),
-                premium: isRegistered,
-                status: statusClean,
-                expiryDate: expiryDateStr || ""
-              }
-            };
-
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({
-                premium: isRegistered,
-                premium_expiry: expiryDateStr,
-                subscription_status: statusClean,
-                social_links: socialLinks
-              })
-              .eq('id', p.id);
-
-            if (updateError) {
-              console.error(`Error updating profile ${p.id} via webhook:`, updateError);
-            } else {
-              console.log(`Successfully updated user ${p.id} to ${statusClean} via webhook.`);
-            }
-          }
-        } else {
-          console.log(`No local profile found matching subscriberId: ${subscriberId}`);
-        }
-      }
-
-      // Return a successful response to bdapps to acknowledge delivery
-      res.json({
-        statusCode: "S1000",
-        statusDetail: "Acknowledge successful delivery"
-      });
-    } catch (err: any) {
-      console.error("Subscription Notify Webhook Error:", err);
-      res.status(500).json({ error: "Internal server error during webhook processing", details: err.message });
-    }
-  });
 
   // --- AI API Proxy Routes ---
 
   // Groq Proxy
   app.post("/api/ai/groq", async (req, res) => {
     try {
-      const { prompt, model, temperature, max_tokens } = req.body;
+      const { prompt, model, temperature, max_tokens, seed, response_format } = req.body;
       const apiKey = process.env.VITE_GROQ_API_KEY || process.env.GROQ_API_KEY;
       
       if (!apiKey) {
@@ -560,11 +37,395 @@ async function startServer() {
         model: model || "llama-3.3-70b-versatile",
         temperature: temperature ?? 0.7,
         max_tokens: max_tokens ?? 1024,
+        ...(seed !== undefined ? { seed } : {}),
+        ...(response_format ? { response_format } : {}),
       });
       res.json(completion);
     } catch (error: any) {
       console.error("Groq Proxy Error:", error);
       res.status(500).json({ error: "AI Proxy request failed", details: error.message });
+    }
+  });
+
+  
+  // --- BDApps API Integration & Mock Sandbox ---
+  
+  // In-memory subscription database for demo purposes when Supabase is mock/local
+  const bdappsSubscriptions = new Map<string, { email: string; phone: string; status: "REGISTERED" | "UNREGISTERED" }>();
+  const activeOtpRequests = new Map<string, { phone: string; otp: string; referenceNo: string }>();
+
+  // Helper to standardise phone number (add tel:88 if missing)
+  const formatSubscriberId = (phone: string) => {
+    let raw = phone.replace(/[^0-9]/g, '');
+    if (raw.startsWith('0')) {
+      raw = '88' + raw;
+    } else if (!raw.startsWith('880') && raw.length === 10) {
+      raw = '880' + raw;
+    }
+    return `tel:${raw}`;
+  };
+
+  // 1. Check user subscription status
+  app.post("/api/bdapps/status", async (req, res) => {
+    try {
+      const { email, phone } = req.body;
+      const appId = process.env.BDAPPS_APP_ID;
+      const appPassword = process.env.BDAPPS_PASSWORD;
+      const bdappsUrl = process.env.BDAPPS_SERVER_URL || "https://developer.bdapps.com";
+
+      if (!email && !phone) {
+        return res.status(400).json({ error: "Email or phone is required" });
+      }
+
+      // First check in-memory / local state
+      let localSub = Array.from(bdappsSubscriptions.values()).find(s => s.email === email || s.phone === phone);
+      
+      // If we have real BDApps credentials, query live BDApps status
+      if (appId && appPassword && phone) {
+        try {
+          const subscriberId = formatSubscriberId(phone);
+          const response = await fetch(`${bdappsUrl}/subscription/getStatus`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              applicationId: appId,
+              password: appPassword,
+              subscriberId: subscriberId
+            })
+          });
+
+          const data: any = await response.json();
+          if (data.statusCode === "S1000") {
+            const isSubscribed = data.subscriptionStatus === "REGISTERED";
+            
+            // Sync with local memory database
+            if (email) {
+              bdappsSubscriptions.set(email, {
+                email,
+                phone,
+                status: data.subscriptionStatus
+              });
+            }
+
+            return res.json({
+              success: true,
+              subscribed: isSubscribed,
+              status: data.subscriptionStatus,
+              provider: "bdapps",
+              details: data.statusDetail
+            });
+          }
+        } catch (e: any) {
+          console.error("Real BDApps status check failed:", e.message);
+        }
+      }
+
+      // Fallback to local checked status if available
+      if (localSub) {
+        return res.json({
+          success: true,
+          subscribed: localSub.status === "REGISTERED",
+          status: localSub.status,
+          provider: "bdapps"
+        });
+      }
+
+      return res.json({
+        success: true,
+        subscribed: false,
+        status: "UNREGISTERED",
+        provider: "bdapps"
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 2. Request OTP to Subscribe
+  app.post("/api/bdapps/otp-request", async (req, res) => {
+    try {
+      const { phone } = req.body;
+      if (!phone) {
+        return res.status(400).json({ error: "Phone number is required" });
+      }
+
+      const formattedPhone = phone.replace(/[^0-9]/g, '');
+      const subscriberId = formatSubscriberId(phone);
+      
+      const appId = process.env.BDAPPS_APP_ID;
+      const appPassword = process.env.BDAPPS_PASSWORD;
+      const bdappsUrl = process.env.BDAPPS_SERVER_URL || process.env.BDAPPS_BASE_URL || "https://developer.bdapps.com";
+
+      // If we have credentials, make actual BDApps API call
+      if (appId && appPassword && appId !== "APP_XXXXXX" && appPassword !== "your_bdapps_api_password") {
+        try {
+          const payload = {
+            applicationId: appId,
+            password: appPassword,
+            subscriberId: subscriberId,
+            applicationHash: "SkillProofHash",
+            applicationMetaData: {
+              client: "WEB",
+              device: "Browser",
+              os: "WebBrowser",
+              appCode: "https://skillproof.top"
+            }
+          };
+
+          const response = await fetch(`${bdappsUrl}/otp/request`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json;charset=utf-8' },
+            body: JSON.stringify(payload)
+          });
+
+          const data: any = await response.json();
+          if (data.statusCode === "S1000") {
+            return res.json({
+              success: true,
+              referenceNo: data.referenceNo,
+              mode: "live",
+              message: "OTP sent successfully to your mobile number."
+            });
+          } else {
+            return res.status(400).json({
+              error: data.statusDetail || `Failed to request OTP from BDApps (Code: ${data.statusCode})`,
+              code: data.statusCode
+            });
+          }
+        } catch (e: any) {
+          console.error("Real BDApps OTP Request failed:", e.message);
+          return res.status(502).json({
+            error: `BDApps API Connection failed: ${e.message}. Please try again later.`
+          });
+        }
+      }
+
+      return res.status(400).json({
+        error: "BDApps configuration is missing or invalid. Please configure BDAPPS_APP_ID and BDAPPS_PASSWORD."
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 3. Verify OTP to activate Subscription
+  app.post("/api/bdapps/otp-verify", async (req, res) => {
+    try {
+      const { referenceNo, otp, email } = req.body;
+      if (!referenceNo || !otp || !email) {
+        return res.status(400).json({ error: "ReferenceNo, OTP, and user email are required" });
+      }
+
+      const appId = process.env.BDAPPS_APP_ID;
+      const appPassword = process.env.BDAPPS_PASSWORD;
+      const bdappsUrl = process.env.BDAPPS_SERVER_URL || process.env.BDAPPS_BASE_URL || "https://developer.bdapps.com";
+
+      // If live credentials are setup
+      if (appId && appPassword && appId !== "APP_XXXXXX" && appPassword !== "your_bdapps_api_password") {
+        try {
+          const response = await fetch(`${bdappsUrl}/otp/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json;charset=utf-8' },
+            body: JSON.stringify({
+              applicationId: appId,
+              password: appPassword,
+              referenceNo: referenceNo,
+              otp: otp
+            })
+          });
+
+          const data: any = await response.json();
+          if (data.statusCode === "S1000") {
+            const phoneNum = data.subscriberId ? data.subscriberId.replace("tel:", "") : "unknown";
+            
+            // Register subscription in memory database
+            bdappsSubscriptions.set(email, {
+              email: email,
+              phone: phoneNum,
+              status: "REGISTERED"
+            });
+
+            return res.json({
+              success: true,
+              message: "Subscription activated successfully!",
+              status: "REGISTERED",
+              mode: "live"
+            });
+          } else {
+            return res.status(400).json({
+              error: data.statusDetail || `Invalid OTP code (Code: ${data.statusCode})`,
+              code: data.statusCode
+            });
+          }
+        } catch (e: any) {
+          console.error("Real BDApps OTP Verification failed:", e.message);
+          return res.status(502).json({
+            error: `BDApps API Connection failed during verification: ${e.message}. Please try again.`
+          });
+        }
+      }
+
+      return res.status(400).json({
+        error: "BDApps configuration is missing or invalid. OTP verification failed."
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 4. Unsubscribe Service (Bootcamp required)
+  app.post("/api/bdapps/unsubscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const appId = process.env.BDAPPS_APP_ID;
+      const appPassword = process.env.BDAPPS_PASSWORD;
+      const bdappsUrl = process.env.BDAPPS_SERVER_URL || "https://developer.bdapps.com";
+
+      const sub = bdappsSubscriptions.get(email);
+      const phone = sub ? sub.phone : null;
+
+      if (appId && appPassword && phone) {
+        try {
+          const subscriberId = formatSubscriberId(phone);
+          const response = await fetch(`${bdappsUrl}/subscription/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              applicationId: appId,
+              password: appPassword,
+              subscriberId: subscriberId,
+              action: 0 // 0 means unsubscribe
+            })
+          });
+
+          const data: any = await response.json();
+          if (data.statusCode === "S1000") {
+            bdappsSubscriptions.set(email, {
+              ...sub!,
+              status: "UNREGISTERED"
+            });
+
+            return res.json({
+              success: true,
+              message: "Unsubscribed successfully from BDApps carrier billing.",
+              mode: "live"
+            });
+          } else {
+            return res.status(400).json({
+              error: data.statusDetail || `Failed to unsubscribe from BDApps (Code: ${data.statusCode})`
+            });
+          }
+        } catch (e: any) {
+          console.error("Real BDApps unsubscription failed:", e.message);
+          return res.status(502).json({
+            error: `BDApps API Connection failed: ${e.message}`
+          });
+        }
+      }
+
+      return res.status(400).json({
+        error: "BDApps configuration is missing or user phone not found. Cannot complete unsubscription."
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // 5. Webhook callback notifier service (notify service from BDApps)
+  app.post("/api/bdapps/callback", async (req, res) => {
+    try {
+      const { subscriberId, status, applicationId } = req.body;
+      console.log(`[BDApps Webhook Callback Received] App: ${applicationId}, Subscriber: ${subscriberId}, Status: ${status}`);
+
+      if (subscriberId) {
+        const rawPhone = subscriberId.replace("tel:", "").replace(/^88/, "");
+        
+        // Find existing record in memory map & update it
+        for (const [email, sub] of bdappsSubscriptions.entries()) {
+          const subPhoneClean = sub.phone.replace(/^88/, "");
+          if (subPhoneClean === rawPhone) {
+            bdappsSubscriptions.set(email, {
+              ...sub,
+              status: status === "REGISTERED" ? "REGISTERED" : "UNREGISTERED"
+            });
+            console.log(`[BDApps Webhook] Updated user ${email} subscription status to ${status}`);
+          }
+        }
+      }
+
+      // Always return S1000 success code to BDApps callback system
+      res.json({
+        statusCode: "S1000",
+        statusDetail: "Success callback received."
+      });
+    } catch (err: any) {
+      console.error("Webhook callback error:", err);
+      res.status(500).json({ statusCode: "E1601", statusDetail: err.message });
+    }
+  });
+
+  // 6. Send Alert SMS on Password Failure
+  app.post("/api/bdapps/sms-alert", async (req, res) => {
+    try {
+      const { phone, email } = req.body;
+      const message = `Security Alert: Suspicious login attempt with wrong password on SkillProof account for ${email}. If this wasn't you, please secure your account.`;
+      
+      const appId = process.env.BDAPPS_APP_ID;
+      const appPassword = process.env.BDAPPS_PASSWORD;
+      const bdappsUrl = process.env.BDAPPS_SERVER_URL || "https://developer.bdapps.com";
+
+      if (appId && appPassword && phone) {
+        try {
+          const subscriberId = formatSubscriberId(phone);
+          const response = await fetch(`${bdappsUrl}/sms/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json;charset=utf-8' },
+            body: JSON.stringify({
+              version: "1.0",
+              applicationId: appId,
+              password: appPassword,
+              message: message,
+              destinationAddresses: [subscriberId]
+            })
+          });
+          const data: any = await response.json();
+          console.log("[BDApps SMS Alert Response]:", data);
+          return res.json({ success: true, mode: "live", details: data });
+        } catch (e: any) {
+          console.error("Failed to send live SMS alert:", e.message);
+          return res.status(502).json({ error: `Failed to send live SMS: ${e.message}` });
+        }
+      }
+
+      return res.status(400).json({
+        error: "BDApps configuration is missing. Live SMS Alert could not be sent."
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // QR Code Proxy to bypass CORS
+  app.get("/api/qr-proxy", async (req, res) => {
+    try {
+      const { url } = req.query;
+      if (!url) {
+        return res.status(400).json({ error: "URL is required" });
+      }
+      const decodedUrl = decodeURIComponent(url as string);
+      const response = await fetch(decodedUrl);
+      const blob = await response.arrayBuffer();
+      const contentType = response.headers.get("content-type") || "image/png";
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.send(Buffer.from(blob));
+    } catch (error: any) {
+      console.error("QR Proxy Error:", error);
+      res.status(500).json({ error: "Failed to proxy QR code", details: error.message });
     }
   });
 
@@ -584,9 +445,15 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
-  });
+  if (typeof PORT === "string" && isNaN(Number(PORT))) {
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on Passenger socket: ${PORT}`);
+    });
+  } else {
+    app.listen(Number(PORT), "0.0.0.0", () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 startServer();

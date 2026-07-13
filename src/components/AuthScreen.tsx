@@ -8,6 +8,7 @@ import { motion } from 'motion/react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Button, Card, ThemeSwitch, LanguageSwitch } from './UI';
+import { supabaseClient, isRealSupabase } from '../lib/supabase';
 import { 
   Mail, Lock, User, Key, Check, AlertCircle, 
   ArrowLeft, Eye, EyeOff, Sparkles 
@@ -63,7 +64,59 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         onAuthSuccess();
       }, 800);
     } else {
-      setErrorMsg(res.error);
+      // Check if it's a password/credential error
+      const isPasswordError = res.error?.toLowerCase().includes('invalid login credentials') || 
+                              res.error?.toLowerCase().includes('password') || 
+                              res.error?.toLowerCase().includes('invalid credentials');
+
+      if (isPasswordError) {
+        let userPhone = '';
+        if (isRealSupabase && supabaseClient) {
+          try {
+            const { data: profile } = await supabaseClient
+              .from('profiles')
+              .select('phone')
+              .eq('email', email)
+              .maybeSingle();
+            if (profile && profile.phone) {
+              userPhone = profile.phone;
+            }
+          } catch (err) {
+            console.error("Error fetching user phone:", err);
+          }
+        } else {
+          try {
+            const profilesStr = localStorage.getItem('skillproof_profiles');
+            if (profilesStr) {
+              const profiles = JSON.parse(profilesStr);
+              const found = profiles.find((p: any) => p.email?.toLowerCase() === email.toLowerCase());
+              if (found && found.phone) {
+                userPhone = found.phone;
+              }
+            }
+          } catch (err) {}
+        }
+
+        // If phone number is found, trigger BDApps/Simulated SMS Alert
+        if (userPhone) {
+          try {
+            await fetch('/api/bdapps/sms-alert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ phone: userPhone, email })
+            });
+          } catch (err) {
+            console.error("Error sending SMS alert:", err);
+          }
+        }
+
+        setErrorMsg(isBn 
+          ? `ভুল পাসওয়ার্ড! নিরাপত্তা সতর্কতার জন্য আপনার রেজিস্টার্ড${userPhone ? ` মোবাইল (${userPhone})` : ''} নাম্বারে একটি সতর্কতা এসএমএস (SMS) পাঠানো হয়েছে।`
+          : `Incorrect password! For security reasons, an alert SMS has been sent to your registered${userPhone ? ` mobile (${userPhone})` : ''} number.`
+        );
+      } else {
+        setErrorMsg(res.error);
+      }
     }
   };
 
@@ -165,12 +218,49 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
     setIsLoading(true);
     await new Promise(resolve => setTimeout(resolve, 800));
-    setIsLoading(false);
-    setSuccessMsg(isBn ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! লগইন করুন।' : 'Password updated successfully! Please login.');
-    setTimeout(() => {
-      setScreen('login');
-      resetFormState();
-    }, 1500);
+
+    try {
+      if (isRealSupabase && supabaseClient) {
+        await supabaseClient.auth.updateUser({ password });
+        
+        // Also save in profiles social_links for backup check
+        const { data: userData } = await supabaseClient.auth.getUser();
+        if (userData?.user) {
+          const { data: currentProfile } = await supabaseClient
+            .from('profiles')
+            .select('social_links')
+            .eq('id', userData.user.id)
+            .maybeSingle();
+
+          const currentSocial = currentProfile?.social_links || {};
+          await supabaseClient
+            .from('profiles')
+            .update({ social_links: { ...currentSocial, customPassword: password } })
+            .eq('id', userData.user.id);
+        }
+      } else {
+        // Simulation mode: update profile password in local profiles list
+        const stored = localStorage.getItem('skillproof_profiles');
+        if (stored) {
+          let profiles = JSON.parse(stored);
+          const idx = profiles.findIndex((p: any) => p.email?.toLowerCase() === email.toLowerCase());
+          if (idx >= 0) {
+            profiles[idx].customPassword = password;
+            localStorage.setItem('skillproof_profiles', JSON.stringify(profiles));
+          }
+        }
+      }
+      
+      setIsLoading(false);
+      setSuccessMsg(isBn ? 'পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! লগইন করুন।' : 'Password updated successfully! Please login.');
+      setTimeout(() => {
+        setScreen('login');
+        resetFormState();
+      }, 1500);
+    } catch (err: any) {
+      setIsLoading(false);
+      setErrorMsg(err.message || (isBn ? 'পাসওয়ার্ড পরিবর্তন ব্যর্থ হয়েছে।' : 'Failed to update password.'));
+    }
   };
 
   return (
@@ -389,7 +479,26 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     </p>
                   </div>
 
-                  <div className="flex flex-col gap-1.5 mt-2">
+                  <div className="p-3.5 bg-brand-green/5 border border-brand-green/10 rounded-xl space-y-1.5 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                    <p className="font-bold text-slate-800 dark:text-slate-200">
+                      {isBn ? '⚠️ পাসওয়ার্ড রিসেট করতে সমস্যা হচ্ছে?' : '⚠️ Having trouble resetting password?'}
+                    </p>
+                    <p>
+                      {isBn 
+                        ? 'আপনার অ্যাকাউন্টের পাসওয়ার্ড রিসেট করতে বা কোনো সমস্যা হলে সরাসরি আমাদের সাপোর্ট ইমেইলে যোগাযোগ করুন:'
+                        : 'If you have any issues or need password reset support, please email us directly at:'}
+                    </p>
+                    <p className="font-bold text-emerald-600 dark:text-emerald-400 font-mono text-xs">
+                      support@skillproof.top
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {isBn
+                        ? 'অথবা প্ল্যাটফর্ম অ্যাডমিনের মাধ্যমে সরাসরি পাসওয়ার্ড রিসেট করিয়ে নিতে পারেন।'
+                        : 'Alternatively, you can request our platform admin to reset your password directly.'}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 mt-1">
                     <label className="text-xs font-semibold text-slate-500 dark:text-slate-400">{t('authEmail')}</label>
                     <div className="relative">
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />

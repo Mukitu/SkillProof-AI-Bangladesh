@@ -26,8 +26,10 @@ import { AiProgressTracker } from './AiProgressTracker';
 import { AiReports } from './AiReports';
 import { AiAssessment } from './AiAssessment';
 import { ProfileTab } from './ProfileTab';
+import { UserJobs } from './UserJobs';
 import { SkillsOverview } from './SkillsOverview';
 import { InterviewRecorder } from './InterviewRecorder';
+import { AiDailyCareerCoach } from './AiDailyCareerCoach';
 import { cvDb } from '../lib/cvSupabase';
 import { interviewDb } from '../lib/interviewSupabase';
 import { passportDb, calculateLevel } from '../lib/passportSupabase';
@@ -525,7 +527,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
   };
 
   // মেনু অপশনসমূহ (Sidebar Menu Definitions)
-  const sidebarMenu: { id: string; labelBn: string; labelEn: string; icon: any; comingSoon?: boolean; }[] = [
+  const baseSidebarMenu: { id: string; labelBn: string; labelEn: string; icon: any; comingSoon?: boolean; }[] = [
     { id: 'dashboard', labelBn: 'ড্যাশবোর্ড হোম', labelEn: 'Dashboard Home', icon: LayoutDashboard },
     { id: 'cv', labelBn: 'এআই সিভি এডিটর', labelEn: 'AI Smart CV', icon: FileText },
     { id: 'interview', labelBn: 'এআই ভাইভা', labelEn: 'AI Interview', icon: Video },
@@ -533,11 +535,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
     { id: 'passport', labelBn: 'স্কিল পাসপোর্ট', labelEn: 'Skill Passport', icon: Award },
     { id: 'growth', labelBn: 'ক্যারিয়ার গ্রোথ হাব', labelEn: 'Career Growth Hub', icon: TrendingUp },
     { id: 'roadmap', labelBn: 'ক্যারিয়ার রোডম্যাপ', labelEn: 'Career Roadmap', icon: Map },
+    { id: 'jobs', labelBn: 'জব পোর্টাল', labelEn: 'Jobs Portal', icon: Briefcase },
+    { id: 'coach', labelBn: 'এআই ডেইলি ক্যারিয়ার কোচ', labelEn: 'AI Career Coach', icon: Cpu },
     { id: 'progress', labelBn: 'অগ্রগতি ট্র্যাকার', labelEn: 'Progress Tracker', icon: BarChart3 },
     { id: 'reports', labelBn: 'এআই রিপোর্ট ও এক্সপোর্ট', labelEn: 'AI Reports & Export', icon: Download },
     { id: 'profile', labelBn: 'আমার প্রোফাইল', labelEn: 'My Profile', icon: User },
     { id: 'settings', labelBn: 'সেটিংস ও নিরাপত্তা', labelEn: 'Settings & Security', icon: Settings },
   ];
+
+  const sidebarMenu = [...baseSidebarMenu];
+  if (user?.email === 'mukituislamnishat@gmail.com' || user?.email === 'nishat.af27@gmail.com') {
+    sidebarMenu.push({ id: 'admin', labelBn: 'অ্যাডমিন প্যানেল 👑', labelEn: 'Admin Panel 👑', icon: Sparkles });
+  }
 
   // প্রোফাইল এডিট সাবমিট (Profile save)
   const handleProfileSave = async (e: React.FormEvent) => {
@@ -708,7 +717,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id)}
+                onClick={() => {
+                  if (item.id === 'admin') {
+                    window.location.pathname = '/admin/dashboard';
+                  } else {
+                    setActiveTab(item.id);
+                  }
+                }}
                 className={`flex items-center justify-between px-4 py-2.5 rounded-lg text-sm font-medium transition-all group ${
                   isActive 
                     ? 'bg-emerald-50 dark:bg-white/5 text-emerald-600 dark:text-emerald-400 border border-emerald-100/50 dark:border-white/10 shadow-sm' 
@@ -782,34 +797,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
           <div className="flex items-center gap-3 sm:gap-4 relative">
             <LanguageSwitch />
             <ThemeSwitch />
-
-            {user?.email === 'nishat.af27@gmail.com' && (
-              <button
-                onClick={() => {
-                  const current = localStorage.getItem("test_unsubscribed_mode");
-                  if (current === "true") {
-                    localStorage.removeItem("test_unsubscribed_mode");
-                    alert(isBn ? "সুপার এডমিন মোড সক্রিয়! আপনি এখন ড্যাশবোর্ড অ্যাক্সেস করতে পারবেন।" : "Super Admin Mode Active! You can now access the full Dashboard.");
-                  } else {
-                    localStorage.setItem("test_unsubscribed_mode", "true");
-                    alert(isBn ? "টেস্টিং মোড সক্রিয়! সাবস্ক্রিপশন পেজটি টেস্ট করার জন্য পেজটি রিফ্রেশ হবে।" : "Testing Mode Active! Refreshing to let you test the subscription page.");
-                  }
-                  window.location.reload();
-                }}
-                className={`text-[10px] font-black px-3 py-1.5 rounded-full transition-all flex items-center gap-1 border ${
-                  localStorage.getItem("test_unsubscribed_mode") === "true"
-                    ? "bg-rose-500/10 text-rose-500 border-rose-500/20 hover:bg-rose-500/20"
-                    : "bg-teal-500/10 text-teal-500 border-teal-500/20 hover:bg-teal-500/20"
-                }`}
-              >
-                <Award className="w-3.5 h-3.5" />
-                <span>
-                  {localStorage.getItem("test_unsubscribed_mode") === "true"
-                    ? (isBn ? "সাবস্ক্রিপশন টেস্ট সক্রিয়" : "Sub Test Active")
-                    : (isBn ? "সাবস্ক্রিপশন টেস্ট করুন" : "Test Subscription")}
-                </span>
-              </button>
-            )}
             
             {/* Notification triggers */}
             <div className="relative">
@@ -883,7 +870,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                         <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{user?.email}</p>
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        {user?.email === 'nishat.af27@gmail.com' && (
+                        {user?.email === 'mukituislamnishat@gmail.com' && (
                           <button 
                             onClick={() => { window.location.pathname = '/admin/dashboard'; }}
                             className="flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-xl transition-all text-left w-full border border-emerald-200/30"
@@ -925,7 +912,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
             <div className="lg:hidden relative">
               <select 
                 value={activeTab} 
-                onChange={(e) => setActiveTab(e.target.value)}
+                onChange={(e) => {
+                  if (e.target.value === 'admin') {
+                    window.location.pathname = '/admin/dashboard';
+                  } else {
+                    setActiveTab(e.target.value);
+                  }
+                }}
                 className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-brand-green"
               >
                 {sidebarMenu.map((m) => (
@@ -1476,43 +1469,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
                     </Card>
 
                   </div>
-
-                  {/* Real-time Api Indicators Live Status Section */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
-                      <div className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </div>
-                      <div>
-                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'গ্রক এআই ইঞ্জিন' : 'Groq AI Engine'}</h5>
-                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'অনলাইন / প্রস্তুত' : 'Online / Ready'}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
-                      <div className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </div>
-                      <div>
-                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'সুপাবেজ ডাটাবেজ' : 'Supabase Database'}</h5>
-                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'সংযুক্ত / সক্রিয়' : 'Connected / Active'}</p>
-                      </div>
-                    </div>
-
-                    <div className="p-4 bg-white dark:bg-[#090909] border border-slate-200 dark:border-white/5 rounded-2xl flex items-center gap-3">
-                      <div className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </div>
-                      <div>
-                        <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">{isBn ? 'ডিভাইস স্টোরেজ ক্যাশ' : 'Local Device Cache'}</h5>
-                        <p className="text-[10px] text-slate-400 font-medium">{isBn ? 'লোকাল মেমরি' : 'Local Storage Cache'}</p>
-                      </div>
-                    </div>
-                  </div>
-
                 </div>
               )}
               
@@ -1581,6 +1537,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
               {/* TAB 6: AI LEARNING ROADMAP (ক্যারিয়ার রোডম্যাপ) */}
               {activeTab === 'roadmap' && (
                 <AiCareerRoadmap 
+                  onNavigateToTab={(tabId) => setActiveTab(tabId)} 
+                />
+              )}
+
+              {/* TAB 6.5: SMART JOBS PORTAL (জব পোর্টাল) */}
+              {activeTab === 'jobs' && user && (
+                <UserJobs 
+                  user={user} 
+                  isBn={isBn} 
+                  onNavigateToTab={(tabId) => setActiveTab(tabId)} 
+                />
+              )}
+
+              {/* TAB 6.7: AI DAILY CAREER COACH (এআই ডেইলি ক্যারিয়ার কোচ) */}
+              {activeTab === 'coach' && (
+                <AiDailyCareerCoach 
                   onNavigateToTab={(tabId) => setActiveTab(tabId)} 
                 />
               )}
@@ -1771,17 +1743,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, initialTab = 'da
             </motion.div>
           </AnimatePresence>
 
-          <footer className="flex flex-col sm:flex-row items-center justify-between pt-8 pb-4 mt-12 border-t border-white/5 gap-4">
-            <p className="text-[10px] text-slate-600 font-mono">© {new Date().getFullYear()} SKILLPROOF AI BANGLADESH • SECURE_ENV_PROD_V1</p>
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-mono font-semibold">Supabase Connected</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                <span className="text-[9px] text-slate-500 uppercase tracking-widest font-mono font-semibold">Server Latency: 42ms</span>
-              </div>
+          <footer className="flex flex-col sm:flex-row items-center justify-between pt-8 pb-4 mt-12 border-t border-slate-200 dark:border-slate-800 gap-4">
+            <p className="text-[11px] text-slate-500 font-sans">© {new Date().getFullYear()} SkillProof AI Bangladesh. All rights reserved.</p>
+            <div className="flex items-center gap-4 text-[11px] text-slate-500">
+              <span>Rajshahi, Bangladesh</span>
             </div>
           </footer>
         </main>

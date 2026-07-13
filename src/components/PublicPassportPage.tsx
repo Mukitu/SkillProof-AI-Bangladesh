@@ -47,8 +47,9 @@ export const PublicPassportPage: React.FC<{ passportId: string }> = ({ passportI
   const handleDownloadQR = () => {
     if (!profile) return;
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(window.location.href)}`;
+    const proxyUrl = `/api/qr-proxy?url=${encodeURIComponent(qrUrl)}`;
     
-    fetch(qrUrl)
+    fetch(proxyUrl)
       .then(response => response.blob())
       .then(blob => {
         const url = window.URL.createObjectURL(blob);

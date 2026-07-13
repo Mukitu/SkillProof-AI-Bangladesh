@@ -58,6 +58,7 @@ export const AdminUsersView: React.FC<UsersViewProps> = ({
   const [editRole, setEditRole] = useState('user');
   const [editFullName, setEditFullName] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editPassword, setEditPassword] = useState('');
   
   // Delete confirm state
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -94,21 +95,35 @@ export const AdminUsersView: React.FC<UsersViewProps> = ({
     setEditRole(user.role);
     setEditFullName(user.fullName);
     setEditPhone(user.phone || '');
+    setEditPassword('');
   };
 
   const handleSaveEdit = async () => {
     if (!editingUser) return;
-    const success = await onUpdateUser(editingUser.id, {
+    const updates: any = {
       fullName: editFullName,
       phone: editPhone,
       role: editRole
-    });
+    };
+    if (editPassword) {
+      updates.customPassword = editPassword;
+    }
+    const success = await onUpdateUser(editingUser.id, updates);
     if (success) {
       // Refresh local selected status if drilldown is open
       if (selectedUser && selectedUser.id === editingUser.id) {
-        setSelectedUser({ ...selectedUser, fullName: editFullName, phone: editPhone, role: editRole });
+        setSelectedUser({ 
+          ...selectedUser, 
+          fullName: editFullName, 
+          phone: editPhone, 
+          role: editRole,
+          customPassword: editPassword || selectedUser.customPassword
+        });
       }
       setEditingUser(null);
+      if (editPassword) {
+        alert(`ব্যবহারকারী পাসওয়ার্ড সফলভাবে রিসেট করা হয়েছে। নতুন পাসওয়ার্ড: ${editPassword}`);
+      }
     }
   };
 
@@ -728,6 +743,19 @@ export const AdminUsersView: React.FC<UsersViewProps> = ({
                 {editingUser.email === 'nishat.af27@gmail.com' && (
                   <span className="text-[10px] text-red-500 block">সিস্টেমের প্রধান সুপাবেজ ক্রিয়েটর রোল লক করা আছে।</span>
                 )}
+              </div>
+
+              {/* Reset Password */}
+              <div className="space-y-1">
+                <label className="font-bold text-slate-600 block">পাসওয়ার্ড পরিবর্তন/রিসেট (Reset Password)</label>
+                <input
+                  type="text"
+                  placeholder="খালি রাখলে আগের পাসওয়ার্ড বহাল থাকবে (উদাঃ skillproof123)"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  className="w-full p-2.5 border border-slate-200 rounded-lg focus:outline-hidden focus:border-emerald-500 text-xs font-sans bg-white"
+                />
+                <span className="text-[10px] text-slate-400 block">অ্যাডমিন পাসওয়ার্ড পরিবর্তন করে ইউজারকে জানালে, সে নতুন পাসওয়ার্ড দিয়ে লগইন করতে পারবে।</span>
               </div>
             </div>
 

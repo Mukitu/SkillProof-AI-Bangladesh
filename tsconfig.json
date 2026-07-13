@@ -25,7 +25,6 @@
     "noEmit": true
   },
   "exclude": [
-    "test-real-update.ts",
     "node_modules",
     "dist"
   ]

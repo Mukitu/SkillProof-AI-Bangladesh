@@ -18,7 +18,8 @@ import {
   Activity, 
   LogOut,
   Sliders,
-  Database
+  Database,
+  Briefcase
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -54,7 +55,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate,
       items: [
         { id: 'users', label: 'ব্যবহারকারী ব্যবস্থাপনা', icon: Users },
         { id: 'passports', label: 'স্কিল পাসপোর্ট', icon: Award },
-        { id: 'subscriptions', label: 'সাবস্ক্রিপশন', icon: CreditCard, roles: ['super_admin', 'admin', 'support'] }
+        { id: 'jobs', label: 'জব সার্কুলার পোর্টাল', icon: Briefcase }
       ]
     },
     {
@@ -64,6 +65,7 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate,
         { id: 'interviews', label: 'এআই ভাইভা (Interviews)', icon: Video },
         { id: 'assessments', label: 'কোডিং অ্যাসেসমেন্ট', icon: GraduationCap },
         { id: 'projects', label: 'প্রজেক্ট সাবমিশন', icon: FolderGit2 },
+        { id: 'project-submissions', label: 'Custom Submissions', icon: FolderGit2 },
         { id: 'reports', label: 'এআই ক্যারিয়ার রিপোর্টস', icon: FileSpreadsheet },
         { id: 'roadmaps', label: 'ক্যারিয়ার রোডম্যাপ', icon: Map }
       ]
@@ -72,7 +74,8 @@ export const AdminSidebar: React.FC<SidebarProps> = ({ currentRoute, onNavigate,
       title: 'পাবলিক পোর্টাল ও এঙ্গেজমেন্ট',
       items: [
         { id: 'verification', label: 'পাবলিক ভেরিফিকেশন', icon: ShieldCheck },
-        { id: 'announcements', label: 'অ্যানাউন্সমেন্ট সেন্টার', icon: Bell, roles: ['super_admin', 'admin', 'moderator'] }
+        { id: 'announcements', label: 'অ্যানাউন্সমেন্ট সেন্টার', icon: Bell, roles: ['super_admin', 'admin', 'moderator'] },
+        { id: 'reviews_stats', label: 'রিভিউ ও পরিসংখ্যান', icon: Sliders, roles: ['super_admin', 'admin'] }
       ]
     }
   ];

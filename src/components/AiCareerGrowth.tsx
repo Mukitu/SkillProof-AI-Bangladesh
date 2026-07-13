@@ -154,7 +154,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin mb-4" />
+        <Loader2 className="w-8 h-8 text-red-500 animate-spin mb-4" />
         <p className="text-slate-400 font-mono">Loading Career Growth Hub...</p>
       </div>
     );
@@ -164,8 +164,8 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
     return (
       <div className="flex flex-col items-center justify-center py-20 space-y-6">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin"></div>
-          <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-emerald-400 animate-pulse" />
+          <div className="w-16 h-16 border-4 border-red-500/20 border-t-red-500 rounded-full animate-spin"></div>
+          <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-red-400 animate-pulse" />
         </div>
         <div className="text-center">
           <h3 className="text-xl font-display font-bold text-white mb-2">Analyzing Your Career Profile</h3>
@@ -190,23 +190,27 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-12 relative overflow-hidden career-roadmap-print-container">
+      {/* Red ambient background glows */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-red-600/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-20 -right-40 w-80 h-80 bg-red-900/5 rounded-full blur-3xl pointer-events-none" />
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div className="bg-gradient-to-r from-red-600/20 via-red-950/15 to-transparent border border-red-500/20 p-6 rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-6 h-6 text-emerald-400" />
+            <TrendingUp className="w-6 h-6 text-red-500" />
             <h1 className="text-2xl font-bold text-white font-display">AI Career Coach</h1>
           </div>
           <p className="text-slate-400 text-sm">
             Personalized career growth plan based on your verified skills and interviews.
           </p>
           <div className="flex items-center gap-2 mt-3 text-xs font-mono text-slate-500">
-            <Clock className="w-3 h-3" />
+            <Clock className="w-3 h-3 text-slate-500" />
             Last updated: {new Date(progress.lastGenerated).toLocaleString()}
           </div>
         </div>
-        <Button onClick={generateNewProgress} variant="outline" className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10">
+        <Button onClick={generateNewProgress} variant="outline" className="border-red-500/30 text-red-400 hover:bg-red-500/10">
           <RefreshCw className="w-4 h-4 mr-2" />
           Refresh Analysis
         </Button>
@@ -216,7 +220,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="p-4 bg-slate-900 border-white/5 text-center">
           <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Overall Score</p>
-          <p className="text-3xl font-bold text-emerald-400">{progress.overallScore}</p>
+          <p className="text-3xl font-bold text-red-500">{progress.overallScore}</p>
         </Card>
         <Card className="p-4 bg-slate-900 border-white/5 text-center">
           <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Resume Score</p>
@@ -236,7 +240,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
         </Card>
         <Card className="p-4 bg-slate-900 border-white/5 text-center">
           <p className="text-slate-400 text-xs mb-1 font-mono uppercase">Profile</p>
-          <p className="text-3xl font-bold text-blue-400">{progress.profileCompletion}%</p>
+          <p className="text-3xl font-bold text-red-400">{progress.profileCompletion}%</p>
         </Card>
       </div>
 
@@ -247,10 +251,10 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
           <Card className="bg-slate-900 border-white/5 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-blue-400" />
+                <Target className="w-5 h-5 text-red-500" />
                 <h2 className="text-lg font-bold text-white">Job Readiness</h2>
               </div>
-              <Badge variant={progress.jobReadiness === 'Highly Competitive' ? 'success' : 'default'}>
+              <Badge variant={progress.jobReadiness === 'Highly Competitive' ? 'danger' : 'brand'}>
                 {progress.jobReadiness}
               </Badge>
             </div>
@@ -259,16 +263,16 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
 
           {/* Strengths & Weaknesses */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="bg-emerald-950/20 border-emerald-500/20 p-5">
+            <Card className="bg-red-950/20 border-red-500/20 p-5">
               <div className="flex items-center gap-2 mb-4">
-                <Zap className="w-5 h-5 text-emerald-400" />
-                <h3 className="text-md font-bold text-emerald-400">Top Strengths</h3>
+                <Zap className="w-5 h-5 text-red-400" />
+                <h3 className="text-md font-bold text-red-400">Top Strengths</h3>
               </div>
               <ul className="space-y-3">
                 {progress.strengths.slice(0,5).map((s, idx) => (
                   <li key={idx} className="flex justify-between items-center text-sm">
                     <span className="text-slate-200">{s.name}</span>
-                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 text-[10px]">{s.confidence}%</Badge>
+                    <Badge variant="outline" className="border-red-500/30 text-red-400 text-[10px]">{s.confidence}%</Badge>
                   </li>
                 ))}
               </ul>
@@ -299,7 +303,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <ArrowRight className="w-4 h-4 text-emerald-500" /> Short-term Focus
+                  <ArrowRight className="w-4 h-4 text-red-500" /> Short-term Focus
                 </h4>
                 <ul className="space-y-2 text-sm text-slate-400 pl-6 list-disc">
                   {progress.aiSuggestions.shortTerm?.map((s,i) => <li key={i}>{s}</li>)}
@@ -307,7 +311,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
               </div>
               <div>
                 <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-                  <ArrowRight className="w-4 h-4 text-blue-500" /> Long-term Goals
+                  <ArrowRight className="w-4 h-4 text-red-500" /> Long-term Goals
                 </h4>
                 <ul className="space-y-2 text-sm text-slate-400 pl-6 list-disc">
                   {progress.aiSuggestions.longTerm?.map((s,i) => <li key={i}>{s}</li>)}
@@ -319,13 +323,13 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
           {/* Career Paths */}
           <Card className="bg-slate-900 border-white/5 p-6">
              <div className="flex items-center gap-2 mb-6">
-                <Map className="w-5 h-5 text-blue-400" />
+                <Map className="w-5 h-5 text-red-500" />
                 <h2 className="text-lg font-bold text-white">Suggested Career Paths</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                {progress.careerPaths.map((cp, idx) => (
                  <div key={idx} className="p-4 rounded-xl border border-white/5 bg-slate-950">
-                    <h3 className="font-bold text-emerald-400 mb-1">{cp.title}</h3>
+                    <h3 className="font-bold text-red-400 mb-1">{cp.title}</h3>
                     <p className="text-xs text-slate-400 mb-3">{cp.matchReason}</p>
                     <div className="text-[10px] font-mono text-slate-500">
                       Missing: {cp.missingSkills.join(', ')} <br/>
@@ -373,7 +377,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
           {/* Action Plan */}
           <Card className="bg-slate-900 border-white/5 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <CheckSquare className="w-5 h-5 text-emerald-400" />
+              <CheckSquare className="w-5 h-5 text-red-400" />
               <h2 className="text-lg font-bold text-white">Action Plan</h2>
             </div>
             
@@ -383,7 +387,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
                 <div className="space-y-2">
                   {progress.actionPlan.today?.map(task => (
                     <div key={task.id} className="flex items-start gap-3">
-                      <button onClick={() => handleTaskToggle('today', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500'}`}>
+                      <button onClick={() => handleTaskToggle('today', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-red-500 border-red-500 text-white' : 'border-slate-600 hover:border-red-500'}`}>
                         {task.completed && <CheckCircle2 className="w-4 h-4 mx-auto" />}
                       </button>
                       <span className={`text-sm ${task.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{task.text}</span>
@@ -397,7 +401,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
                 <div className="space-y-2">
                   {progress.actionPlan.thisWeek?.map(task => (
                     <div key={task.id} className="flex items-start gap-3">
-                      <button onClick={() => handleTaskToggle('thisWeek', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 hover:border-emerald-500'}`}>
+                      <button onClick={() => handleTaskToggle('thisWeek', task.id)} className={`mt-0.5 shrink-0 w-5 h-5 rounded border ${task.completed ? 'bg-red-500 border-red-500 text-white' : 'border-slate-600 hover:border-red-500'}`}>
                         {task.completed && <CheckCircle2 className="w-4 h-4 mx-auto" />}
                       </button>
                       <span className={`text-sm ${task.completed ? 'text-slate-500 line-through' : 'text-slate-300'}`}>{task.text}</span>
@@ -411,14 +415,14 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
           {/* Learning Resources */}
           <Card className="bg-slate-900 border-white/5 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <BookOpen className="w-5 h-5 text-blue-400" />
+              <BookOpen className="w-5 h-5 text-red-400" />
               <h2 className="text-lg font-bold text-white">Resources</h2>
             </div>
             <div className="space-y-3">
               {progress.learningResources.map((res, idx) => (
-                <a key={idx} href={res.url || '#'} target="_blank" rel="noreferrer" className="block p-3 rounded-lg bg-slate-950 border border-white/5 hover:border-emerald-500/30 transition-colors">
+                <a key={idx} href={res.url || '#'} target="_blank" rel="noreferrer" className="block p-3 rounded-lg bg-slate-950 border border-white/5 hover:border-red-500/30 transition-colors">
                   <div className="flex justify-between items-start mb-1">
-                    <span className="font-semibold text-sm text-emerald-400">{res.title}</span>
+                    <span className="font-semibold text-sm text-red-400">{res.title}</span>
                     <ExternalLink className="w-3 h-3 text-slate-500" />
                   </div>
                   <Badge variant="outline" className="text-[9px] mb-2">{res.type}</Badge>
@@ -435,11 +439,11 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
               <h3 className="font-bold text-white">AI Coach Chat</h3>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-950/20">
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3 text-sm text-slate-300">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 text-sm text-slate-300">
                 Hi {user?.fullName}! I'm your AI Career Coach. Ask me anything about your roadmap, resume, or skills.
               </div>
               {chatMessages.map((msg, i) => (
-                <div key={i} className={`p-3 rounded-lg text-sm ${msg.role === 'user' ? 'bg-blue-500/10 border border-blue-500/20 text-blue-100 ml-4' : 'bg-slate-800 border border-white/5 text-slate-300 mr-4'}`}>
+                <div key={i} className={`p-3 rounded-lg text-sm ${msg.role === 'user' ? 'bg-red-500/10 border border-red-500/20 text-red-100 ml-4' : 'bg-slate-800 border border-white/5 text-slate-300 mr-4'}`}>
                   {msg.text}
                 </div>
               ))}
@@ -456,7 +460,7 @@ export const AiCareerGrowth: /* ক্যারিয়ার গ্রোথ হ�
                   value={chatInput} 
                   onChange={e => setChatInput(e.target.value)}
                   placeholder="Ask a question..."
-                  className="flex-1 bg-slate-900 border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500/50"
+                  className="flex-1 bg-slate-900 border border-white/10 rounded-md px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500/50"
                 />
                 <Button type="submit" disabled={!chatInput.trim() || chatLoading} className="px-3">
                   <Play className="w-4 h-4" />

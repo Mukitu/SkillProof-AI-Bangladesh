@@ -3,27 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import Groq from 'groq-sdk';
 import { CvData, InterviewSession, InterviewQA, InterviewMemory } from '../types';
 
 // গ্রক এপিআই কী রিড করা (Retrieve Groq API key)
-const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
 
-let groqClient: Groq | null = null;
-let isRealGroq = false;
-
-if (groqApiKey && groqApiKey !== 'YOUR_GROQ_API_KEY') {
-  try {
-    groqClient = new Groq({
-      apiKey: groqApiKey,
-      dangerouslyAllowBrowser: true
-    });
-    isRealGroq = true;
-    console.log('✅ Groq AI Interview Service Initialized.');
-  } catch (err) {
-    console.error('❌ Groq interview initialization failed:', err);
-  }
-}
+// Backend proxy is used for AI.
+const isRealGroq = true;
 
 const MODEL_NAME = 'llama-3.3-70b-versatile';
 
@@ -113,7 +98,8 @@ You MUST return ONLY a raw JSON object with the following schema (no markdown wr
   generateFirstQuestion: async (
     careerPath: string,
     skills: string[],
-    adaptiveMemory?: InterviewMemory | null
+    adaptiveMemory?: InterviewMemory | null,
+    language: 'en' | 'bn' = 'en'
   ): Promise<string> => {
     let memoryContext = '';
     if (adaptiveMemory) {
@@ -139,7 +125,10 @@ ${memoryContext}
 
 The first question should be an engaging, professional ice-breaker that welcomes them, mentions their career path, and asks them to introduce themselves while summarizing their most prominent project or experience.
 
-Keep the tone extremely polite, corporate yet encouraging. Respond ONLY with the question itself. Output in English.`;
+**CRITICAL INSTRUCTION FOR CONCISENESS**:
+- Keep the question VERY SHORT, brief, and concise (maximum 1 or 2 simple, clear sentences. Do NOT write long paragraphs, complex subclauses, or verbose descriptions).
+- Respond ONLY with the question itself.
+- Output language MUST be: ${language === 'bn' ? 'Bangla (বাংলা)' : 'English'}. Let it flow naturally in that language.`;
 
     try {
       const response = await fetch('/api/ai/groq', {
@@ -171,7 +160,8 @@ Keep the tone extremely polite, corporate yet encouraging. Respond ONLY with the
     qaHistory: InterviewQA[],
     lastAnswer: string,
     questionCount: number, // ১ থেকে শুরু করে কততম প্রশ্ন
-    adaptiveMemory?: InterviewMemory | null
+    adaptiveMemory?: InterviewMemory | null,
+    language: 'en' | 'bn' = 'en'
   ): Promise<{
     nextQuestion: string;
     nextCategory: string;
@@ -229,18 +219,20 @@ Candidate's Latest Answer to the last question:
 
 Task:
 1. Evaluate the candidate's latest answer across 6 core metrics out of 100: Technical, Confidence, Communication, Problem Solving, Professionalism, English. Provide honest, realistic ratings based on the quality of their response.
-2. Provide a 2-sentence professional verbal feedback/encouragement addressing their last answer.
+2. Provide a 2-sentence professional verbal feedback/encouragement addressing their last answer (Write the feedback in ${language === 'bn' ? 'Bangla (বাংলা)' : 'English'}).
 3. Generate the NEXT interview question.
    - **Crucial**: The next question MUST be an intelligent, natural follow-up directly responding to what the candidate just said or deep diving into their technical skills.
    - Do NOT ask generic or disconnected questions. It must flow like a real human dialogue.
    - Automatically blend in a "${nextTypeDescription}" flavor to this next question.
-   - Ensure the question is challenging, highly job-specific, and matches their career path.
+   - Ensure the question is highly job-specific and matches their career path.
+   - **CRITICAL INSTRUCTION FOR CONCISENESS**: The next question MUST be VERY SHORT, brief, and concise (maximum 1 or 2 simple, clear sentences. Do NOT write long paragraphs or verbose questions).
+   - Generate the question in: ${language === 'bn' ? 'Bangla (বাংলা)' : 'English'}.
 
 You MUST return ONLY a raw JSON object matching the following schema (no markdown wrappers like \`\`\`json, no outer text):
 {
-  "nextQuestion": "string (the dynamic next follow-up question)",
+  "nextQuestion": "string (the short, dynamic next follow-up question in ${language === 'bn' ? 'Bangla' : 'English'})",
   "nextCategory": "Technical" | "HR" | "Behavioral" | "Problem Solving" | "Communication" | "English Speaking",
-  "answerFeedback": "string (2-sentence feedback on the previous answer)",
+  "answerFeedback": "string (2-sentence feedback on the previous answer in ${language === 'bn' ? 'Bangla' : 'English'})",
   "answerScores": {
     "technical": number (30-100),
     "confidence": number (30-100),
